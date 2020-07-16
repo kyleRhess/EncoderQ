@@ -8,4 +8,3 @@
 Currently, the processor hardware from the [DroneFluxx](https://github.com/kyleRhess/DroneFluxx) project is being used for testing firmware.
 \
 The only rotary encoder that has been tested so far is the [E6D-C](http://www.ia.omron.com/data_pdf/cat/e6d-c_ds_e_5_1_csm497.pdf) from Omron. This is a 6,000 pulse/revolution incremental encoder. This encoder is capable of quadrature operation which essentially means it can output up to (4*6,000) = 24,000 pulses/revolution.
-\
