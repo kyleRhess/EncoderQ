@@ -79,6 +79,7 @@ struct DataMsg {
 	int32_t dat[2];
 	uint8_t cksum;
 } __attribute__((__packed__));
+
 struct DataMsg datMsg;
 uint8_t *uartBuffer;
 
