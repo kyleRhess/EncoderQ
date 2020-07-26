@@ -1,7 +1,14 @@
 language: c
 
-compiler:
-  - gcc
+- os: linux
+name: "ARM GCC"
+env:
+  - "C_COMPILER=arm-none-eabi-gcc"
+  - "CXX_COMPILER=arm-none-eabi-gcc"
+  - "SIZE=arm-none-eabi-size"
+  - "OBJCOPY=arm-none-eabi-objcopy"
+  - "LINKER=arm-none-eabi-ld"
+  - "LLD=arm-none-eabi-ld.bfd"
 
 script: 
   - sudo apt-get install build-essential 
