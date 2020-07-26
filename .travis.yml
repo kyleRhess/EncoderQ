@@ -8,4 +8,4 @@ script:
   - sudo apt install -y make gcc
   - gcc --version
   - sudo apt-get install gcc-arm-none-eabi
-  - gcc -I./include -I./system/include/stm32f4-hal -I./system/include/cmsis -o main ./src/main.c
+  - gcc-arm-none-eabi -I./include -I./system/include/stm32f4-hal -I./system/include/cmsis -I./system/include/diag -o main ./src/main.c
