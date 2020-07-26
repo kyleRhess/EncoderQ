@@ -4,5 +4,7 @@ compiler:
   - gcc
 
 script: 
+  - sudo apt-get install build-essential 
   - sudo apt install -y make gcc
   - gcc --version
+  - sudo apt-get install gcc-arm-none-eabi
