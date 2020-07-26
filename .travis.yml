@@ -3,4 +3,6 @@ language: c
 compiler:
   - gcc
 
-script: arm-none-eabi-gcc
+script: 
+  - sudo apt install -y make gcc
+  - gcc --version
