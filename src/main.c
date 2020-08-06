@@ -134,10 +134,11 @@ int main(int argc, char* argv[])
 	gDataPin.Speed 	= GPIO_SPEED_HIGH;
 	HAL_GPIO_Init(GPIOC, &gDataPin);
 
-	HAL_TIM_Encoder_Start(&htim5,TIM_CHANNEL_ALL);
+	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_ALL);
 
 	while (1)
 	{
+		// Set LED values
 		uint32_t bigNum = ((htim5.Instance->CNT / 4) % 4) + 1;
 		switch (bigNum)
 		{
