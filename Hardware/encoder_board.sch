@@ -1031,4 +1031,23 @@ Wire Wire Line
 	2150 3650 2250 3650
 Wire Notes Line
 	1850 3750 1850 2500
+Text GLabel 9850 1600 2    50   Input ~ 0
+DAC_1
+Wire Wire Line
+	9850 1600 9800 1600
+Text GLabel 4650 1100 0    50   Input ~ 0
+DAC_1
+$Comp
+L Connector:Conn_01x01_Female J7
+U 1 1 5F3064C5
+P 4900 1100
+F 0 "J7" H 4927 1126 50  0000 L CNN
+F 1 "Conn_01x01_Female" H 4927 1035 50  0000 L CNN
+F 2 "TestPoint:TestPoint_Plated_Hole_D2.0mm" H 4900 1100 50  0001 C CNN
+F 3 "~" H 4900 1100 50  0001 C CNN
+	1    4900 1100
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4700 1100 4650 1100
 $EndSCHEMATC
