@@ -40,6 +40,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "PWM.h"
 #include "diag/Trace.h"
 #include "cmsis_device.h"
 
@@ -71,8 +72,12 @@ UART_HandleTypeDef huart1;
 __IO ITStatus UartReady					= SET;
 static TIM_HandleTypeDef SamplingTimer 	= { .Instance = TIM9 };
 static float deltaDegrees	 			= 0.0f;
+static float degreesPsec	 			= 0.0f;
 static uint32_t timeElapUs 				= 0;
 static uint32_t timeElapMs 				= 0;
+
+
+PWM_Out PWMtimer;
 
 struct DataMsg {
 	uint8_t start;
@@ -119,6 +124,8 @@ int main(int argc, char* argv[])
 	MX_TIM5_Init();
 	MX_USART1_UART_Init();
 
+	InitPWMOutput();
+
 	HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn,0,0);
 	HAL_NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
 
@@ -136,8 +143,20 @@ int main(int argc, char* argv[])
 
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_ALL);
 
+	HAL_TIM_PWM_Start(&timer_PWM, TIM_CHANNEL_1);
+
+//	PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, 10.1f);
+
 	while (1)
 	{
+//		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, (deltaDegrees/360.0f)*100.0f);
+
+//		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, 0.03f);
+
+		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, htim5.Instance->CNT*(PULSE_NS_PER_CNT/1000.0f));
+
+//		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, degreesPsec);
+
 		// Set LED values
 		uint32_t bigNum = ((htim5.Instance->CNT / 4) % 4) + 1;
 		switch (bigNum)
@@ -170,6 +189,21 @@ int main(int argc, char* argv[])
 				break;
 		}
 	}
+}
+
+
+/*
+ * Timer used for motor ESC control
+ */
+int InitPWMOutput()
+{
+	PWMtimer.numChannels 	= 1;
+	PWMtimer.frequency 		= PWM_FREQ;
+	PWMtimer.TIM 			= TIM1;
+	PWMtimer.Channel 		= TIM_CHANNEL_1;
+	PWMtimer.timer 			= Initialize_PWM(&PWMtimer);
+
+	return HAL_OK;
 }
 
 static void WritePin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIO_PinState PinState)
@@ -281,10 +315,20 @@ static int InitSamplingTimer()
 void TIM1_BRK_TIM9_IRQHandler(void) { HAL_TIM_IRQHandler(&SamplingTimer); }
 
 static int timer9Divisor = 0;
+static int timer9Count = 0;
+static float deltaDegreesLast = 0.0f;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	deltaDegrees 	= ((float)(int32_t)TIM5->CNT * (360.0f / (6000.0f * 4.0f)));
 	timeElapUs 		+= 40;
+
+	timer9Count++;
+	if(timer9Count >= 100)
+	{
+		degreesPsec = (deltaDegrees - deltaDegreesLast)/((40.0f/1000000.0f)*(float)timer9Count);
+		deltaDegreesLast = deltaDegrees;
+		timer9Count = 0;
+	}
 
 	timer9Divisor++;
 	if(timer9Divisor >= 25)

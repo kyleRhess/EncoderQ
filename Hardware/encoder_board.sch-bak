@@ -65,7 +65,7 @@ P 1000 1150
 F 0 "C1" H 1178 1196 50  0000 L CNN
 F 1 "1uF" H 1178 1105 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 1000 1150 50  0001 C CNN
-F 3 "" H 1000 1150 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/samsung-electro-mechanics/CL10A105KP8NNNC/1276-1182-1-ND/3889268" H 1000 1150 50  0001 C CNN
 	1    1000 1150
 	1    0    0    -1  
 $EndComp
@@ -110,7 +110,7 @@ P 2400 1250
 F 0 "C2" H 2578 1296 50  0000 L CNN
 F 1 "10nF" H 2578 1205 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 2400 1250 50  0001 C CNN
-F 3 "" H 2400 1250 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/CC0603KPX7R9BB103/311-1572-1-ND/4340579" H 2400 1250 50  0001 C CNN
 	1    2400 1250
 	1    0    0    -1  
 $EndComp
@@ -171,7 +171,7 @@ P 3650 1850
 F 0 "C4" H 3765 1896 50  0000 L CNN
 F 1 "0.1uF" H 3765 1805 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 3688 1700 50  0001 C CNN
-F 3 "~" H 3650 1850 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/kemet/C0603C104Z3VACTU/399-1100-1-ND/411375" H 3650 1850 50  0001 C CNN
 	1    3650 1850
 	1    0    0    -1  
 $EndComp
@@ -182,7 +182,7 @@ P 4000 1850
 F 0 "C5" H 4115 1896 50  0000 L CNN
 F 1 "10nF" H 4115 1805 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 4038 1700 50  0001 C CNN
-F 3 "~" H 4000 1850 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/CC0603KPX7R9BB103/311-1572-1-ND/4340579" H 4000 1850 50  0001 C CNN
 	1    4000 1850
 	1    0    0    -1  
 $EndComp
@@ -256,7 +256,7 @@ P 7600 1250
 F 0 "C6" H 7715 1296 50  0000 L CNN
 F 1 "0.1uF" H 7715 1205 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 7638 1100 50  0001 C CNN
-F 3 "~" H 7600 1250 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/kemet/C0603C104Z3VACTU/399-1100-1-ND/411375" H 7600 1250 50  0001 C CNN
 	1    7600 1250
 	1    0    0    -1  
 $EndComp
@@ -280,7 +280,7 @@ P 8150 1650
 F 0 "C7" H 8265 1696 50  0000 L CNN
 F 1 "2.2uF" H 8265 1605 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 8188 1500 50  0001 C CNN
-F 3 "~" H 8150 1650 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/kemet/C0603C225K4PACTU/399-7886-1-ND/3471609" H 8150 1650 50  0001 C CNN
 	1    8150 1650
 	1    0    0    -1  
 $EndComp
@@ -395,7 +395,7 @@ P 7900 1450
 F 0 "R7" V 7695 1450 50  0000 C CNN
 F 1 "10k" V 7786 1450 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 7940 1440 50  0001 C CNN
-F 3 "~" H 7900 1450 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603FR-0710KL/311-10-0KHRCT-ND/729827" H 7900 1450 50  0001 C CNN
 	1    7900 1450
 	-1   0    0    1   
 $EndComp
@@ -583,7 +583,8 @@ P 1700 4700
 F 0 "U2" H 1700 5215 50  0000 C CNN
 F 1 "HCMS-2903" H 1700 5124 50  0000 C CNN
 F 2 "kyleRhess_packages:HCMS-290x" H 2000 4300 50  0001 C CNN
-F 3 "" H 2000 4300 50  0001 C CNN
+F 3 "https://docs.broadcom.com/doc/AV02-0699EN" H 2000 4300 50  0001 C CNN
+F 4 "https://www.digikey.com/product-detail/en/broadcom-limited/HCMS-2903/516-1173-5-ND/637437" H 1700 4700 50  0001 C CNN "Digikey"
 	1    1700 4700
 	1    0    0    -1  
 $EndComp
@@ -594,7 +595,7 @@ P 2550 4650
 F 0 "R5" V 2345 4650 50  0000 C CNN
 F 1 "10k" V 2436 4650 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 2590 4640 50  0001 C CNN
-F 3 "~" H 2550 4650 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603FR-0710KL/311-10-0KHRCT-ND/729827" H 2550 4650 50  0001 C CNN
 	1    2550 4650
 	0    1    1    0   
 $EndComp
@@ -666,7 +667,7 @@ P 7150 1400
 F 0 "R6" V 6945 1400 50  0000 C CNN
 F 1 "470" V 7036 1400 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 7190 1390 50  0001 C CNN
-F 3 "~" H 7150 1400 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738" H 7150 1400 50  0001 C CNN
 	1    7150 1400
 	-1   0    0    1   
 $EndComp
@@ -751,7 +752,7 @@ P 1300 3650
 F 0 "R4" V 1095 3650 50  0000 C CNN
 F 1 "470" V 1186 3650 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 1340 3640 50  0001 C CNN
-F 3 "~" H 1300 3650 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738" H 1300 3650 50  0001 C CNN
 	1    1300 3650
 	0    1    1    0   
 $EndComp
@@ -762,7 +763,7 @@ P 900 3650
 F 0 "D4" H 891 3866 50  0000 C CNN
 F 1 "LED" H 891 3775 50  0000 C CNN
 F 2 "LED_SMD:LED_0603_1608Metric" H 900 3650 50  0001 C CNN
-F 3 "~" H 900 3650 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633" H 900 3650 50  0001 C CNN
 	1    900  3650
 	1    0    0    -1  
 $EndComp
@@ -775,7 +776,7 @@ P 1300 3350
 F 0 "R3" V 1095 3350 50  0000 C CNN
 F 1 "470" V 1186 3350 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 1340 3340 50  0001 C CNN
-F 3 "~" H 1300 3350 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738" H 1300 3350 50  0001 C CNN
 	1    1300 3350
 	0    1    1    0   
 $EndComp
@@ -786,7 +787,7 @@ P 900 3350
 F 0 "D3" H 891 3566 50  0000 C CNN
 F 1 "LED" H 891 3475 50  0000 C CNN
 F 2 "LED_SMD:LED_0603_1608Metric" H 900 3350 50  0001 C CNN
-F 3 "~" H 900 3350 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633" H 900 3350 50  0001 C CNN
 	1    900  3350
 	1    0    0    -1  
 $EndComp
@@ -799,7 +800,7 @@ P 1300 3050
 F 0 "R2" V 1095 3050 50  0000 C CNN
 F 1 "470" V 1186 3050 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 1340 3040 50  0001 C CNN
-F 3 "~" H 1300 3050 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738" H 1300 3050 50  0001 C CNN
 	1    1300 3050
 	0    1    1    0   
 $EndComp
@@ -810,7 +811,7 @@ P 900 3050
 F 0 "D2" H 891 3266 50  0000 C CNN
 F 1 "LED" H 891 3175 50  0000 C CNN
 F 2 "LED_SMD:LED_0603_1608Metric" H 900 3050 50  0001 C CNN
-F 3 "~" H 900 3050 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633" H 900 3050 50  0001 C CNN
 	1    900  3050
 	1    0    0    -1  
 $EndComp
@@ -823,7 +824,7 @@ P 1300 2750
 F 0 "R1" V 1095 2750 50  0000 C CNN
 F 1 "470" V 1186 2750 50  0000 C CNN
 F 2 "Resistor_SMD:R_0603_1608Metric" V 1340 2740 50  0001 C CNN
-F 3 "~" H 1300 2750 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738" H 1300 2750 50  0001 C CNN
 	1    1300 2750
 	0    1    1    0   
 $EndComp
@@ -834,7 +835,7 @@ P 900 2750
 F 0 "D1" H 891 2966 50  0000 C CNN
 F 1 "LED" H 891 2875 50  0000 C CNN
 F 2 "LED_SMD:LED_0603_1608Metric" H 900 2750 50  0001 C CNN
-F 3 "~" H 900 2750 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633" H 900 2750 50  0001 C CNN
 	1    900  2750
 	1    0    0    -1  
 $EndComp
@@ -1015,7 +1016,7 @@ P 3250 1850
 F 0 "C3" H 3365 1896 50  0000 L CNN
 F 1 "2.2uF" H 3365 1805 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric" H 3288 1700 50  0001 C CNN
-F 3 "~" H 3250 1850 50  0001 C CNN
+F 3 "https://www.digikey.com/product-detail/en/kemet/C0603C225K4PACTU/399-7886-1-ND/3471609" H 3250 1850 50  0001 C CNN
 	1    3250 1850
 	1    0    0    -1  
 $EndComp
@@ -1043,7 +1044,7 @@ U 1 1 5F3064C5
 P 4900 1100
 F 0 "J7" H 4927 1126 50  0000 L CNN
 F 1 "Conn_01x01_Female" H 4927 1035 50  0000 L CNN
-F 2 "TestPoint:TestPoint_Pad_D2.0mm" H 4900 1100 50  0001 C CNN
+F 2 "TestPoint:TestPoint_Plated_Hole_D2.0mm" H 4900 1100 50  0001 C CNN
 F 3 "~" H 4900 1100 50  0001 C CNN
 	1    4900 1100
 	1    0    0    -1  

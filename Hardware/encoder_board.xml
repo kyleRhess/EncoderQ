@@ -2,7 +2,7 @@
 <export version="D">
   <design>
     <source>R:\Documents\GitHub\EncoderQ\Hardware\encoder_board.sch</source>
-    <date>8/8/2020 10:50:15 PM</date>
+    <date>8/9/2020 3:26:25 PM</date>
     <tool>Eeschema (5.1.6)-1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -38,6 +38,7 @@
     <comp ref="C1">
       <value>1uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
+      <datasheet>https://www.digikey.com/product-detail/en/samsung-electro-mechanics/CL10A105KP8NNNC/1276-1182-1-ND/3889268</datasheet>
       <libsource lib="pspice" part="CAP" description="Capacitor symbol for simulation only"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BBEC4B8</tstamp>
@@ -45,6 +46,7 @@
     <comp ref="C2">
       <value>10nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/CC0603KPX7R9BB103/311-1572-1-ND/4340579</datasheet>
       <libsource lib="pspice" part="CAP" description="Capacitor symbol for simulation only"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BBECE27</tstamp>
@@ -52,7 +54,7 @@
     <comp ref="C4">
       <value>0.1uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/kemet/C0603C104Z3VACTU/399-1100-1-ND/411375</datasheet>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BBEFFAA</tstamp>
@@ -60,7 +62,7 @@
     <comp ref="C5">
       <value>10nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/CC0603KPX7R9BB103/311-1572-1-ND/4340579</datasheet>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BBEFFB1</tstamp>
@@ -68,7 +70,7 @@
     <comp ref="C6">
       <value>0.1uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/kemet/C0603C104Z3VACTU/399-1100-1-ND/411375</datasheet>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC062E6</tstamp>
@@ -76,7 +78,7 @@
     <comp ref="C7">
       <value>2.2uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/kemet/C0603C225K4PACTU/399-7886-1-ND/3471609</datasheet>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC08697</tstamp>
@@ -92,7 +94,7 @@
     <comp ref="R7">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603FR-0710KL/311-10-0KHRCT-ND/729827</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC56AA8</tstamp>
@@ -124,6 +126,10 @@
     <comp ref="U2">
       <value>HCMS-2903</value>
       <footprint>kyleRhess_packages:HCMS-290x</footprint>
+      <datasheet>https://docs.broadcom.com/doc/AV02-0699EN</datasheet>
+      <fields>
+        <field name="Digikey">https://www.digikey.com/product-detail/en/broadcom-limited/HCMS-2903/516-1173-5-ND/637437</field>
+      </fields>
       <libsource lib="kyleRhess_Misc" part="HCMS-2903" description=""/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5F34A079</tstamp>
@@ -131,7 +137,7 @@
     <comp ref="R5">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603FR-0710KL/311-10-0KHRCT-ND/729827</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5F34C748</tstamp>
@@ -146,7 +152,7 @@
     <comp ref="R6">
       <value>470</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5F380C36</tstamp>
@@ -154,7 +160,7 @@
     <comp ref="R4">
       <value>470</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC2A0FD</tstamp>
@@ -162,7 +168,7 @@
     <comp ref="D4">
       <value>LED</value>
       <footprint>LED_SMD:LED_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633</datasheet>
       <libsource lib="Device" part="LED" description="Light emitting diode"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC2A0F6</tstamp>
@@ -170,7 +176,7 @@
     <comp ref="R3">
       <value>470</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC286CF</tstamp>
@@ -178,7 +184,7 @@
     <comp ref="D3">
       <value>LED</value>
       <footprint>LED_SMD:LED_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633</datasheet>
       <libsource lib="Device" part="LED" description="Light emitting diode"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC286C8</tstamp>
@@ -186,7 +192,7 @@
     <comp ref="R2">
       <value>470</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC26D85</tstamp>
@@ -194,7 +200,7 @@
     <comp ref="D2">
       <value>LED</value>
       <footprint>LED_SMD:LED_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633</datasheet>
       <libsource lib="Device" part="LED" description="Light emitting diode"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC26D7E</tstamp>
@@ -202,7 +208,7 @@
     <comp ref="R1">
       <value>470</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/yageo/RC0603JR-07470RL/311-470GRCT-ND/729738</datasheet>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC1BB56</tstamp>
@@ -210,7 +216,7 @@
     <comp ref="D1">
       <value>LED</value>
       <footprint>LED_SMD:LED_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/rohm-semiconductor/SML-D14VWT86A/846-1199-1-ND/5722633</datasheet>
       <libsource lib="Device" part="LED" description="Light emitting diode"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BC188F9</tstamp>
@@ -234,7 +240,7 @@
     <comp ref="C3">
       <value>2.2uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric</footprint>
-      <datasheet>~</datasheet>
+      <datasheet>https://www.digikey.com/product-detail/en/kemet/C0603C225K4PACTU/399-7886-1-ND/3471609</datasheet>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamp>5BBEFFA3</tstamp>
