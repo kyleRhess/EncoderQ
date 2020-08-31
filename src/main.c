@@ -40,9 +40,14 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "system.h"
 #include "PWM.h"
+#include "SPI.h"
+#include "hcms.h"
+#include "characters.h"
 #include "diag/Trace.h"
 #include "cmsis_device.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -94,7 +99,6 @@ uint8_t *uartBuffer;
 /* USER CODE BEGIN PFP */
 
 static int InitSamplingTimer(void);
-static void WritePin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIO_PinState PinState);
 static void MX_GPIO_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_USART1_UART_Init(void);
@@ -120,32 +124,57 @@ int main(int argc, char* argv[])
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	setHighSystemClk();
 	HAL_Init();
+
+
+
+	MX_GPIO_Init();
+
+	init_display();
+
+
 	InitSamplingTimer();
 	MX_TIM5_Init();
 	MX_USART1_UART_Init();
 
 	InitPWMOutput();
 
-	HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn,0,0);
+	HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn, 1, 0);
 	HAL_NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
 
 	RCC->AHB1ENR 	= RCC_AHB1ENR_GPIOCEN;
 	RCC->AHB1ENR 	|= RCC_AHB1ENR_GPIOAEN;
 
-	MX_GPIO_Init();
 
-	GPIO_InitTypeDef gDataPin;
-	gDataPin.Pin 	= GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
-	gDataPin.Mode 	= GPIO_MODE_OUTPUT_PP;
-	gDataPin.Pull 	= GPIO_PULLUP;
-	gDataPin.Speed 	= GPIO_SPEED_HIGH;
-	HAL_GPIO_Init(GPIOC, &gDataPin);
+	// LED pins setup
+	GPIO_InitTypeDef gLEDPins;
+	gLEDPins.Pin 	= GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
+	gLEDPins.Mode 	= GPIO_MODE_OUTPUT_PP;
+	gLEDPins.Pull 	= GPIO_PULLUP;
+	gLEDPins.Speed 	= GPIO_SPEED_HIGH;
+	HAL_GPIO_Init(GPIOC, &gLEDPins);
+
+
+	// OUT_Z pin setup
+	GPIO_InitTypeDef gZPin;
+	gZPin.Pin 		= GPIO_PIN_7;
+	gZPin.Mode 		= GPIO_MODE_IT_RISING;
+	gZPin.Pull 		= GPIO_NOPULL;
+	gZPin.Speed 	= GPIO_SPEED_HIGH;
+	HAL_GPIO_Init(GPIOA, &gZPin);
+	/* EXTI interrupt init*/
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+
 
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_ALL);
 
 	HAL_TIM_PWM_Start(&timer_PWM, TIM_CHANNEL_1);
 
+
+
 //	PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, 10.1f);
+
 
 	while (1)
 	{
@@ -153,12 +182,64 @@ int main(int argc, char* argv[])
 
 //		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, 0.03f);
 
+//		for (int i = 0; i < 20; ++i)
+//		{
+//			uint8_t val = (uint8_t)(htim5.Instance->CNT >> (8 * (i % 5)));
+//			IMU_txBuff[i] = val; //0xAA;
+//		}
+
+		uint32_t bigNum = ((htim5.Instance->CNT / 4) % 4) + 1;
+
+
+//			set_brightness(mapVal((float)htim5.Instance->CNT, 0.0f, 1000000.0f, 0.0f, 100.0f));
+
+
+
+//		int degreess = (int)(deltaDegrees*10.0f);
+//		char str[4] = {0,0,0,0};
+//		sprintf(str, "%d", (int)deltaDegrees);
+//		memcpy(&spi_txBuff[0+0], &all_chars[str[0]][0], 5);
+//		memcpy(&spi_txBuff[0+5], &all_chars[str[1]][0], 5);
+//		memcpy(&spi_txBuff[0+5+5], &all_chars[str[2]][0], 5);
+//		memcpy(&spi_txBuff[0+5+5+5], &all_chars[str[3]][0], 5);
+
+		for (int i = 0; i < htim5.Instance->CNT*100; ++i)
+		{
+			char to_add = (char)rand();
+		}
+
+
+		static char to_add = 32;
+		to_add++;
+		if (to_add >= 127) to_add = 32;
+		add_character(to_add);
+		update_display();
+
+
+//		memcpy(&spi_txBuff[0+0], &all_chars['R'][0], 5);
+//		memcpy(&spi_txBuff[0+5], &all_chars['O'][0], 5);
+//		memcpy(&spi_txBuff[0+5+5], &all_chars['S'][0], 5);
+//		memcpy(&spi_txBuff[0+5+5+5], &all_chars['E'][0], 5);
+
+
+
+//		for (int i = 5; i < 20; ++i)
+//		{
+//			spi_txBuff[i] = (uint8_t)rand();
+//		}
+//			write_display(20);
+
+//		WritePin(GPIOB, GPIO_PIN_8, 0);
+//		SPI_SendReceive(&SPI_Bus_1, SPI1_CS_PORT, SPI1_CS0, &spi_txBuff[0], &spi_rxBuff[0], 20);
+//		WritePin(GPIOB, GPIO_PIN_8, 0);
+
+
 		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, htim5.Instance->CNT*(PULSE_NS_PER_CNT/1000.0f));
 
 //		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, degreesPsec);
 
 		// Set LED values
-		uint32_t bigNum = ((htim5.Instance->CNT / 4) % 4) + 1;
+#if 0
 		switch (bigNum)
 		{
 			case 1:
@@ -188,7 +269,20 @@ int main(int argc, char* argv[])
 			default:
 				break;
 		}
+#endif
 	}
+}
+
+
+/**
+* @brief This function handles EXTI line0.
+*/
+void EXTI9_5_IRQHandler(void)
+{
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
+
+	htim5.Instance->CNT = 0;
+	WritePin(GPIOC, GPIO_PIN_15, !ReadPin(GPIOC, GPIO_PIN_15));
 }
 
 
@@ -204,14 +298,6 @@ int InitPWMOutput()
 	PWMtimer.timer 			= Initialize_PWM(&PWMtimer);
 
 	return HAL_OK;
-}
-
-static void WritePin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIO_PinState PinState)
-{
-	if(PinState != GPIO_PIN_RESET)
-		GPIOx->BSRR = GPIO_Pin;
-	else
-		GPIOx->BSRR = (uint32_t)GPIO_Pin << 16U;
 }
 
 /**

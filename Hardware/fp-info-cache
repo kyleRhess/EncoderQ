@@ -1,4 +1,4 @@
-19321487060896942
+19334267147240651
 Battery
 BatteryHolder_Bulgin_BX0036_1xC
 Bulgin Battery Holder, BX0036, Battery Type C (https://www.bulgin.com/products/pub/media/bulgin/data/Battery_holders.pdf)
@@ -50043,6 +50043,13 @@ DIL DIP PDIP 5.08mm 7.62mm 300mil
 4
 4
 Diode_THT
+Diode_Bridge_IXYS_GUFP
+Three phase, Bridge, Rectifier
+diode module
+0
+5
+5
+Diode_THT
 Diode_Bridge_Round_D8.9mm
 4-lead round diode bridge package, diameter 8.9mm, pin pitch 5.08mm, see http://cdn-reichelt.de/documents/datenblatt/A400/W005M-W10M_SEP.PDF
 diode bridge 8.9mm 8.85mm WOB pitch 5.08mm
@@ -61145,6 +61152,13 @@ UDFN-10 U-DFN2510-10 Diodes
 10
 10
 Package_DFN_QFN
+Diodes_UDFN2020-6_Type-F
+U-DFN2020-6 (Type F) (https://www.diodes.com/assets/Package-Files/U-DFN2020-6-Type-F.pdf) 
+U-DFN2020-6 (Type F)
+0
+8
+8
+Package_DFN_QFN
 HVQFN-24-1EP_4x4mm_P0.5mm_EP2.5x2.5mm
 HVQFN, 24 Pin (https://www.nxp.com/docs/en/package-information/SOT616-3.pdf), generated with kicad-footprint-generator ipc_noLead_generator.py
 HVQFN NoLead
@@ -68935,6 +68949,13 @@ huson nolead SOT1061
 0
 4
 3
+Package_SON
+HVSON-8-1EP_3x3mm_P0.65mm_EP1.6x2.4mm
+HVSON, 8 Pin (https://www.nxp.com/docs/en/data-sheet/TJA1051.pdf#page=16), generated with kicad-footprint-generator ipc_noLead_generator.py
+HVSON NoLead
+0
+13
+9
 Package_SON
 HVSON-8-1EP_4x4mm_P0.8mm_EP2.2x3.1mm
 HVSON, 8 Pin (https://www.nxp.com/docs/en/data-sheet/PCF8523.pdf (page 57)), generated with kicad-footprint-generator ipc_noLead_generator.py
@@ -85512,6 +85533,20 @@ kyleRhess_packages
 31
 31
 kyleRhess_packages
+ACS712
+
+
+0
+9
+9
+kyleRhess_packages
+CSD18537NQ5A
+
+
+0
+8
+8
+kyleRhess_packages
 C_0805
 Capacitor SMD 0805, reflow soldering, AVX (see smccp.pdf)
 capacitor 0805
@@ -85540,6 +85575,13 @@ lga land grid array
 12
 12
 kyleRhess_packages
+LP3943ISQNOPB
+
+
+0
+25
+25
+kyleRhess_packages
 MK22FN1M0AVLK12
 
 
@@ -85553,3 +85595,17 @@ resistor 0805
 0
 2
 2
+kyleRhess_packages
+SD2114S040S8R0
+
+
+0
+2
+2
+kyleRhess_packages
+XZBGRBBRMER158W
+
+
+0
+4
+4
