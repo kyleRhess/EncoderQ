@@ -9,20 +9,23 @@ void characters_init()
 	memset(&character_buff, 0, 4);
 }
 
-void add_character(char to_add)
+void add_characters(char *to_add, int num_to_add)
 {
 	static uint8_t idx = 0;
 
-	if (idx >= sizeof(character_buff)/sizeof(character_buff[0]))
+	for (int i = 0; i < num_to_add; ++i)
 	{
-		character_buff[0] = character_buff[1];
-		character_buff[1] = character_buff[2];
-		character_buff[2] = character_buff[3];
-		character_buff[3] = to_add;
-	}
-	else
-	{
-		character_buff[idx++] = to_add;
+		if (idx >= sizeof(character_buff)/sizeof(character_buff[0]))
+		{
+			character_buff[0] = character_buff[1];
+			character_buff[1] = character_buff[2];
+			character_buff[2] = character_buff[3];
+			character_buff[3] = to_add[i];
+		}
+		else
+		{
+			character_buff[idx++] = to_add[i];
+		}
 	}
 
 

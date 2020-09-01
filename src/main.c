@@ -195,25 +195,12 @@ int main(int argc, char* argv[])
 
 
 
-//		int degreess = (int)(deltaDegrees*10.0f);
-//		char str[4] = {0,0,0,0};
-//		sprintf(str, "%d", (int)deltaDegrees);
-//		memcpy(&spi_txBuff[0+0], &all_chars[str[0]][0], 5);
-//		memcpy(&spi_txBuff[0+5], &all_chars[str[1]][0], 5);
-//		memcpy(&spi_txBuff[0+5+5], &all_chars[str[2]][0], 5);
-//		memcpy(&spi_txBuff[0+5+5+5], &all_chars[str[3]][0], 5);
-
-		for (int i = 0; i < htim5.Instance->CNT*100; ++i)
-		{
-			char to_add = (char)rand();
-		}
-
-
-		static char to_add = 32;
-		to_add++;
-		if (to_add >= 127) to_add = 32;
-		add_character(to_add);
+		char str[4] = {0,0,0,0};
+		sprintf(str, "%d", (int)deltaDegrees);
+		add_characters(str, 4);
 		update_display();
+
+
 
 
 //		memcpy(&spi_txBuff[0+0], &all_chars['R'][0], 5);
@@ -280,8 +267,6 @@ int main(int argc, char* argv[])
 void EXTI9_5_IRQHandler(void)
 {
 	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
-
-	htim5.Instance->CNT = 0;
 	WritePin(GPIOC, GPIO_PIN_15, !ReadPin(GPIOC, GPIO_PIN_15));
 }
 
