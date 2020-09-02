@@ -1,7 +1,13 @@
+#include <string.h>
 #include "system.h"
 #include "SPI.h"
 #include "hcms.h"
 #include "characters.h"
+
+uint8_t all_chars[256][5];
+GPIO_InitTypeDef gResetPin;
+GPIO_InitTypeDef gRSPin;
+GPIO_InitTypeDef gBlankPin;
 
 static float lookuparr[64] = {
 	0.0000f,0.0000f,0.0000f,0.0000f,0.5270f,0.8500f,1.0230f,1.2410f,
@@ -37,7 +43,7 @@ static uint8_t pwm_arr[64] = {
 	0x0D,0x0C,0x0F,0x0E,0x0D,0x0F,0x0E,0x0F
 };
 
-char character_buff[4];
+static SPI_Bus SPI_Bus_1;
 
 static int lookup(float target, float *arr, int idx, int size)
 {
@@ -103,31 +109,20 @@ void init_display()
 	HAL_NVIC_SetPriority(SPI1_IRQn, 2, 0);
 	HAL_NVIC_EnableIRQ(SPI1_IRQn);
 
-	// Init control word 0
-//	spi_txBuff[0] = CTRL_WORD_0_MASK & (NORM_MODE_MASK | PEAK_BRT_31 | 0x01);
-//	write_display(1);
-
 	set_brightness(10.0f);
-
-
-}
-
-void write_display(uint16_t bytes)
-{
-	WritePin(GPIOB, GPIO_PIN_8, 1);
-	SPI_SendReceive(&SPI_Bus_1, SPI1_CS_PORT, SPI1_CS0, &spi_txBuff[0], &spi_rxBuff[0], bytes);
-	WritePin(GPIOB, GPIO_PIN_8, 0);
 }
 
 void update_display()
 {
-	memcpy(&spi_txBuff[0+0], &all_chars[character_buff[0]][0], 5);
-	memcpy(&spi_txBuff[0+5], &all_chars[character_buff[1]][0], 5);
-	memcpy(&spi_txBuff[0+5+5], &all_chars[character_buff[2]][0], 5);
-	memcpy(&spi_txBuff[0+5+5+5], &all_chars[character_buff[3]][0], 5);
+	memcpy(&spi_txBuff[1+0], &all_chars[(uint8_t)character_buff[0]][0], 5);
+	memcpy(&spi_txBuff[1+5], &all_chars[(uint8_t)character_buff[1]][0], 5);
+	memcpy(&spi_txBuff[1+5+5], &all_chars[(uint8_t)character_buff[2]][0], 5);
+	memcpy(&spi_txBuff[1+5+5+5], &all_chars[(uint8_t)character_buff[3]][0], 5);
 
-	WritePin(GPIOB, GPIO_PIN_8, 0);
-	SPI_SendReceive(&SPI_Bus_1, SPI1_CS_PORT, SPI1_CS0, &spi_txBuff[0], &spi_rxBuff[0], 20);
+	SPI_SendReceive(&SPI_Bus_1, SPI1_CS_PORT, SPI1_CS0, &spi_txBuff[1], &spi_rxBuff[1], 20);
+
+	WritePin(GPIOB, GPIO_PIN_8, 1);
+	SPI_SendReceive(&SPI_Bus_1, SPI1_CS_PORT, SPI1_CS0, &spi_txBuff[0], &spi_rxBuff[0], 1);
 	WritePin(GPIOB, GPIO_PIN_8, 0);
 }
 
@@ -136,7 +131,6 @@ void set_brightness(float percent)
 	int map_idx = 0;
 	map_idx = lookup(percent, lookuparr, (sizeof(lookuparr)/sizeof(lookuparr[0]))/2, sizeof(lookuparr)/sizeof(lookuparr[0]));
 	spi_txBuff[0] = CTRL_WORD_0_MASK & (NORM_MODE_MASK | peak_arr[map_idx] | pwm_arr[map_idx]);
-	write_display(1);
 }
 
 

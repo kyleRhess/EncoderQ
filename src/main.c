@@ -45,70 +45,23 @@
 #include "SPI.h"
 #include "hcms.h"
 #include "characters.h"
+#include "Serial.h"
 #include "diag/Trace.h"
 #include "cmsis_device.h"
 
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-/* USER CODE BEGIN PV */
-
 TIM_HandleTypeDef htim5;
 UART_HandleTypeDef huart1;
-__IO ITStatus UartReady					= SET;
 static TIM_HandleTypeDef SamplingTimer 	= { .Instance = TIM9 };
 static float deltaDegrees	 			= 0.0f;
 static float degreesPsec	 			= 0.0f;
 static uint32_t timeElapUs 				= 0;
 static uint32_t timeElapMs 				= 0;
 
-
 PWM_Out PWMtimer;
-
-struct DataMsg {
-	uint8_t start;
-	int32_t dat[2];
-	uint8_t cksum;
-} __attribute__((__packed__));
-
-struct DataMsg datMsg;
-uint8_t *uartBuffer;
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-/* USER CODE BEGIN PFP */
 
 static int InitSamplingTimer(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM5_Init(void);
-static void MX_USART1_UART_Init(void);
-
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-
-// ----- main() ---------------------------------------------------------------
 
 // Sample pragmas to cope with warnings. Please note the related line at
 // the end of this function, used to pop the compiler diagnostics status.
@@ -125,16 +78,13 @@ int main(int argc, char* argv[])
 	setHighSystemClk();
 	HAL_Init();
 
-
-
 	MX_GPIO_Init();
 
 	init_display();
 
-
 	InitSamplingTimer();
 	MX_TIM5_Init();
-	MX_USART1_UART_Init();
+	InitSerial(115200, UART_STOPBITS_1, UART_WORDLENGTH_8B, UART_PARITY_NONE);
 
 	InitPWMOutput();
 
@@ -143,20 +93,19 @@ int main(int argc, char* argv[])
 
 	RCC->AHB1ENR 	= RCC_AHB1ENR_GPIOCEN;
 	RCC->AHB1ENR 	|= RCC_AHB1ENR_GPIOAEN;
-
+	RCC->AHB1ENR 	|= RCC_AHB1ENR_GPIOBEN;
 
 	// LED pins setup
 	GPIO_InitTypeDef gLEDPins;
-	gLEDPins.Pin 	= GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
+	gLEDPins.Pin 	= LED_A | LED_B | LED_C | LED_D;
 	gLEDPins.Mode 	= GPIO_MODE_OUTPUT_PP;
 	gLEDPins.Pull 	= GPIO_PULLUP;
 	gLEDPins.Speed 	= GPIO_SPEED_HIGH;
-	HAL_GPIO_Init(GPIOC, &gLEDPins);
-
+	HAL_GPIO_Init(LED_PORT, &gLEDPins);
 
 	// OUT_Z pin setup
 	GPIO_InitTypeDef gZPin;
-	gZPin.Pin 		= GPIO_PIN_7;
+	gZPin.Pin 		= Z_INTERRUPT;
 	gZPin.Mode 		= GPIO_MODE_IT_RISING;
 	gZPin.Pull 		= GPIO_NOPULL;
 	gZPin.Speed 	= GPIO_SPEED_HIGH;
@@ -165,111 +114,33 @@ int main(int argc, char* argv[])
 	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
-
-
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_ALL);
-
 	HAL_TIM_PWM_Start(&timer_PWM, TIM_CHANNEL_1);
-
-
-
-//	PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, 10.1f);
-
 
 	while (1)
 	{
-//		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, (deltaDegrees/360.0f)*100.0f);
+		set_brightness(deltaDegrees/10.0f);
 
-//		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, 0.03f);
-
-//		for (int i = 0; i < 20; ++i)
-//		{
-//			uint8_t val = (uint8_t)(htim5.Instance->CNT >> (8 * (i % 5)));
-//			IMU_txBuff[i] = val; //0xAA;
-//		}
-
-		uint32_t bigNum = ((htim5.Instance->CNT / 4) % 4) + 1;
-
-
-//			set_brightness(mapVal((float)htim5.Instance->CNT, 0.0f, 1000000.0f, 0.0f, 100.0f));
-
-
-
-		char str[4] = {0,0,0,0};
+		static char str[4] = {0, 0, 0, 0};
+		memset(str, 0, 4);
 		sprintf(str, "%d", (int)deltaDegrees);
 		add_characters(str, 4);
 		update_display();
 
-
-
-
-//		memcpy(&spi_txBuff[0+0], &all_chars['R'][0], 5);
-//		memcpy(&spi_txBuff[0+5], &all_chars['O'][0], 5);
-//		memcpy(&spi_txBuff[0+5+5], &all_chars['S'][0], 5);
-//		memcpy(&spi_txBuff[0+5+5+5], &all_chars['E'][0], 5);
-
-
-
-//		for (int i = 5; i < 20; ++i)
-//		{
-//			spi_txBuff[i] = (uint8_t)rand();
-//		}
-//			write_display(20);
-
-//		WritePin(GPIOB, GPIO_PIN_8, 0);
-//		SPI_SendReceive(&SPI_Bus_1, SPI1_CS_PORT, SPI1_CS0, &spi_txBuff[0], &spi_rxBuff[0], 20);
-//		WritePin(GPIOB, GPIO_PIN_8, 0);
-
-
-		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, htim5.Instance->CNT*(PULSE_NS_PER_CNT/1000.0f));
-
-//		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, degreesPsec);
-
-		// Set LED values
-#if 0
-		switch (bigNum)
-		{
-			case 1:
-				WritePin(GPIOC, GPIO_PIN_12, 1);
-				WritePin(GPIOC, GPIO_PIN_13, 0);
-				WritePin(GPIOC, GPIO_PIN_14, 0);
-				WritePin(GPIOC, GPIO_PIN_15, 0);
-				break;
-			case 2:
-				WritePin(GPIOC, GPIO_PIN_12, 0);
-				WritePin(GPIOC, GPIO_PIN_13, 1);
-				WritePin(GPIOC, GPIO_PIN_14, 0);
-				WritePin(GPIOC, GPIO_PIN_15, 0);
-				break;
-			case 3:
-				WritePin(GPIOC, GPIO_PIN_12, 0);
-				WritePin(GPIOC, GPIO_PIN_13, 0);
-				WritePin(GPIOC, GPIO_PIN_14, 1);
-				WritePin(GPIOC, GPIO_PIN_15, 0);
-				break;
-			case 4:
-				WritePin(GPIOC, GPIO_PIN_12, 0);
-				WritePin(GPIOC, GPIO_PIN_13, 0);
-				WritePin(GPIOC, GPIO_PIN_14, 0);
-				WritePin(GPIOC, GPIO_PIN_15, 1);
-				break;
-			default:
-				break;
-		}
-#endif
+		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, htim5.Instance->CNT*(PULSE_NS_PER_CNT/100));
 	}
-}
 
+}
 
 /**
 * @brief This function handles EXTI line0.
 */
 void EXTI9_5_IRQHandler(void)
 {
-	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
-	WritePin(GPIOC, GPIO_PIN_15, !ReadPin(GPIOC, GPIO_PIN_15));
+	HAL_GPIO_EXTI_IRQHandler(Z_INTERRUPT);
+	WritePin(LED_PORT, LED_D, !ReadPin(LED_PORT, LED_D));
+	htim5.Instance->CNT = 0;
 }
-
 
 /*
  * Timer used for motor ESC control
@@ -325,28 +196,6 @@ static void MX_TIM5_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-	huart1.Instance 			= USART1;
-	huart1.Init.BaudRate 		= 115200;
-	huart1.Init.WordLength 		= UART_WORDLENGTH_8B;
-	huart1.Init.StopBits 		= UART_STOPBITS_1;
-	huart1.Init.Parity 			= UART_PARITY_NONE;
-	huart1.Init.Mode 			= UART_MODE_TX_RX;
-	huart1.Init.HwFlowCtl 		= UART_HWCONTROL_NONE;
-	huart1.Init.OverSampling 	= UART_OVERSAMPLING_16;
-
-	if (HAL_UART_Init(&huart1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -357,14 +206,6 @@ static void MX_GPIO_Init(void)
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 }
-
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-	if(UartHandle->Instance == USART1)
-		UartReady = SET;
-}
-
-void USART1_IRQHandler(void) { HAL_UART_IRQHandler(&huart1); }
 
 static int InitSamplingTimer()
 {
@@ -406,27 +247,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		timeElapMs 		+= 1;
 		timer9Divisor 	= 0;
-		int i 			= 0;
-		uint8_t* pU8 	= (uint8_t*) &datMsg.dat[0];
-		datMsg.start 	= 0xAB;
-		datMsg.dat[0] 	= (int32_t)(deltaDegrees*10000.0f); // deg
-		datMsg.dat[1] 	= (uint32_t)timeElapUs;
+//		int i 			= 0;
+//		uint8_t* pU8 	= (uint8_t*) &datMsg.dat[0];
+//		datMsg.start 	= 0xAB;
+//		datMsg.dat[0] 	= (int32_t)(deltaDegrees*10000.0f); // deg
+//		datMsg.dat[1] 	= (uint32_t)timeElapUs;
+//
+//		datMsg.cksum 	= 0;
+//		datMsg.cksum 	+= datMsg.start;
+//		datMsg.cksum 	+= pU8[i++]; // Deg
+//		datMsg.cksum 	+= pU8[i++];
+//		datMsg.cksum 	+= pU8[i++];
+//		datMsg.cksum 	+= pU8[i++];
+//		datMsg.cksum 	+= pU8[i++]; // Time
+//		datMsg.cksum 	+= pU8[i++];
+//		datMsg.cksum 	+= pU8[i++];
+//		datMsg.cksum 	+= pU8[i++];
+//		datMsg.cksum 	= 256 - datMsg.cksum;
+//
+//		uartBuffer 		= (uint8_t*)&datMsg;
+//		UartReady 		= RESET;
+//		HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(struct DataMsg));
 
-		datMsg.cksum 	= 0;
-		datMsg.cksum 	+= datMsg.start;
-		datMsg.cksum 	+= pU8[i++]; // Deg
-		datMsg.cksum 	+= pU8[i++];
-		datMsg.cksum 	+= pU8[i++];
-		datMsg.cksum 	+= pU8[i++];
-		datMsg.cksum 	+= pU8[i++]; // Time
-		datMsg.cksum 	+= pU8[i++];
-		datMsg.cksum 	+= pU8[i++];
-		datMsg.cksum 	+= pU8[i++];
-		datMsg.cksum 	= 256 - datMsg.cksum;
-
-		uartBuffer 		= (uint8_t*)&datMsg;
-		UartReady 		= RESET;
-		HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(struct DataMsg));
+		if(timeElapMs % 500 == 0) WritePin(LED_PORT, LED_C, !ReadPin(LED_PORT, LED_C));
 	}
 }
 

@@ -1,6 +1,14 @@
 #ifndef SYSTEM_H_ /* include guard */
 #define SYSTEM_H_
 
+#define LED_A 		GPIO_PIN_12
+#define LED_B 		GPIO_PIN_13
+#define LED_C 		GPIO_PIN_14
+#define LED_D 		GPIO_PIN_15
+#define LED_PORT 	GPIOC
+
+#define Z_INTERRUPT	GPIO_PIN_7
+
 #include "stm32f4xx_hal.h"
 
 

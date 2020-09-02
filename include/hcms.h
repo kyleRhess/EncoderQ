@@ -14,17 +14,15 @@
 
 
 
-SPI_Bus SPI_Bus_1;
-GPIO_InitTypeDef gResetPin;
-GPIO_InitTypeDef gRSPin;
-GPIO_InitTypeDef gBlankPin;
+extern GPIO_InitTypeDef gResetPin;
+extern GPIO_InitTypeDef gRSPin;
+extern GPIO_InitTypeDef gBlankPin;
 
 void init_reset_pin();
 void init_reg_pin();
 void init_blank_pin();
 void init_display();
 
-void write_display(uint16_t bytes);
 void update_display();
 void set_brightness(float percent);
 
