@@ -6,8 +6,12 @@
 #include "characters.h"
 #include "hcms.h"
 
+
+volatile uint8_t toggle = 0;
+
 static int errorSet = 0;
 UART_HandleTypeDef s_UARTHandle = { .Instance = USART1 };
+
 __IO ITStatus UartReady				= SET;
 __IO ITStatus UartRxCmdReady 		= RESET;
 
@@ -21,12 +25,14 @@ int InitSerial(uint32_t baudrate, uint32_t stopbits, uint32_t datasize, uint32_t
 	s_UARTHandle.Init.Parity     	= parity;
 	s_UARTHandle.Init.Mode       	= USART_MODE_TX_RX;
 	s_UARTHandle.Init.HwFlowCtl 	= UART_HWCONTROL_NONE;
-	s_UARTHandle.Init.OverSampling 	= UART_OVERSAMPLING_8;
+	s_UARTHandle.Init.OverSampling 	= UART_OVERSAMPLING_16;
 	rc = HAL_UART_Init(&s_UARTHandle);
 
 	datMsg.msgCnt 	= 0;
 	serialODR 		= 50;
-	rxIndex 		= 0;
+	rxIndexA 		= 0;
+	rxIndexB 		= 0;
+	rxBufferSwitch  = 0;
 	connLoss 		= 0;
 	firstSync 		= 1;
 	handshakeCMD 	= 0;
@@ -100,70 +106,57 @@ uint8_t calcCRC(uint8_t datArr[], size_t size)
 }
 
 
-/*
- * UART Interrupts
- */
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-	if(UartHandle->Instance == USART1)
-		UartReady = RESET;
-}
 
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
-{
-	if(UartHandle->Instance == USART1)
-	{
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, GPIO_PIN_SET);
-		errorSet = 1;
-		if(__HAL_UART_GET_FLAG(UartHandle, UART_FLAG_ORE) != RESET)
-		{
-			if(__HAL_UART_GET_FLAG(UartHandle, UART_FLAG_RXNE) == RESET)
-				UartHandle->Instance->DR;
-		}
-	}
-}
+
+
 
 /*
  *
  */
-void USART1_IRQHandler(void)
-{
-	if(s_UARTHandle.Instance == USART1)
-	{
-		if(s_UARTHandle.gState != HAL_UART_STATE_BUSY_TX &&
-				UartRxCmdReady == RESET)
-		{
-			// Copy ISR buffer into RX buffer
-			uartRx[0] = (uint8_t)(s_UARTHandle.Instance->DR & (uint8_t)0x00FF);
-			add_characters(&uartRx[0], 1);
-			update_display();
-
-			__HAL_UART_FLUSH_DRREGISTER(&s_UARTHandle);
-			__HAL_UART_CLEAR_FEFLAG(&s_UARTHandle);
-
-//			char str[4] = {0,0,0,0};
-//			sprintf(str, "0x%X", (uint8_t)(s_UARTHandle.Instance->DR & (uint8_t)0x00FF));
-//			add_characters(&uartRx[rxIndex-4], 4);
-//			update_display();
-
-			if(rxIndex >= RX_BUFF_SZ)
-			{
-//				memcpy(&uartTx, &uartRx, RX_BUFF_SZ);
-//				HAL_UART_Transmit_IT(&s_UARTHandle, uartTx, RX_BUFF_SZ);
-//				memset(&uartRx, 0, RX_BUFF_SZ);
-				rxIndex = 0;
-				UartRxCmdReady = RESET;
-			}
-			return;
-		}
-		else if(s_UARTHandle.gState == HAL_UART_STATE_BUSY_TX)
-		{
-			//UartReady = RESET;
-		}
-	}
-	HAL_UART_IRQHandler(&s_UARTHandle);
-	return;
-}
+//void USART1_IRQHandler(void)
+//{
+//	if(s_UARTHandle.gState != HAL_UART_STATE_BUSY_TX)
+//	{
+//		if(rxBufferSwitch == 0)
+//		{
+//			// Copy ISR buffer into RX buffer
+//			uartRxA[rxIndexA++] = (uint8_t)(s_UARTHandle.Instance->DR & (uint8_t)0x00FF);
+//
+//			if(rxIndexA >= TX_BUFF_SZ)
+//			{
+//				memcpy(&uartTx, &uartRxA, TX_BUFF_SZ);
+//				HAL_UART_Transmit_IT(&s_UARTHandle, uartTx, TX_BUFF_SZ);
+//				rxIndexA = 0;
+//				rxBufferSwitch = 1;
+//			}
+//		}
+//		else
+//		{
+//			// Copy ISR buffer into RX buffer
+//			uartRxB[rxIndexB++] = (uint8_t)(s_UARTHandle.Instance->DR & (uint8_t)0x00FF);
+//
+//			if(rxIndexB >= TX_BUFF_SZ)
+//			{
+//				memcpy(&uartTx, &uartRxB, TX_BUFF_SZ);
+//				HAL_UART_Transmit_IT(&s_UARTHandle, uartTx, TX_BUFF_SZ);
+//				rxIndexB = 0;
+//				rxBufferSwitch = 0;
+//			}
+//		}
+//
+//		add_characters((uint8_t)(s_UARTHandle.Instance->DR & (uint8_t)0x00FF), 1);
+//		update_display();
+//
+//		// Clear out the rx uart register
+//		__HAL_UART_FLUSH_DRREGISTER(&s_UARTHandle);
+//		__HAL_UART_CLEAR_FEFLAG(&s_UARTHandle);
+//	}
+//
+//	UartRxCmdReady = RESET;
+//
+//	HAL_UART_IRQHandler(&s_UARTHandle);
+//	return;
+//}
 
 //void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 //{

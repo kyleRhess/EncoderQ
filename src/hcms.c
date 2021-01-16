@@ -106,7 +106,7 @@ void init_display()
 	// Setup SPI port
 	SPI_Initialize(&SPI_Bus_1, SPI1, SPI_BAUDRATEPRESCALER_32, SPI_FIRSTBIT_MSB, SPI_POLARITY_LOW);
 	SPI_Initialize_CS(SPI1_CS_PORT, SPI1_CS0);
-	HAL_NVIC_SetPriority(SPI1_IRQn, 2, 0);
+	HAL_NVIC_SetPriority(SPI1_IRQn, 3, 0);
 	HAL_NVIC_EnableIRQ(SPI1_IRQn);
 
 	set_brightness(10.0f);

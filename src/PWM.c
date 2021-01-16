@@ -16,9 +16,9 @@ TIM_HandleTypeDef Initialize_PWM(PWM_Out * PWMType)
 	memset(&timer_PWM, 0, sizeof(timer_PWM));
 
 	timer_PWM.Instance 				= TIM;
-	timer_PWM.Init.Prescaler 		= ((CLOCK_CYCLES_PER_SECOND / COUNTERFREQ) - 1);
+	timer_PWM.Init.Prescaler 		= PWM_PRESCALE;
 	timer_PWM.Init.CounterMode 		= TIM_COUNTERMODE_UP;
-	timer_PWM.Init.Period 			= PWM_STEPS - 1; // ARR -> counter max
+	timer_PWM.Init.Period 			= PWM_PERIOD;//PWM_STEPS - 1; // ARR -> counter max
 	timer_PWM.Init.ClockDivision 	= TIM_CLOCKDIVISION_DIV1;
 
 	HAL_TIM_PWM_Init(&timer_PWM);
@@ -32,13 +32,15 @@ TIM_HandleTypeDef Initialize_PWM(PWM_Out * PWMType)
 
 	if(nChannels <= 1)
 	{
-		HAL_TIM_PWM_ConfigChannel(&timer_PWM, &configOC, TIM_CHANNEL_1);
-		HAL_TIM_PWM_Start(&timer_PWM, TIM_CHANNEL_1);
+		HAL_TIM_PWM_ConfigChannel(&timer_PWM, &configOC, PWMType->Channel);
+		HAL_TIM_PWM_Start(&timer_PWM, PWMType->Channel);
 	}
 	else if(nChannels <= 2)
 	{
 		HAL_TIM_PWM_ConfigChannel(&timer_PWM, &configOC, TIM_CHANNEL_1);
 		HAL_TIM_PWM_Start(&timer_PWM, TIM_CHANNEL_1);
+
+		configOC.OCPolarity = TIM_OCPOLARITY_LOW;
 		HAL_TIM_PWM_ConfigChannel(&timer_PWM, &configOC, TIM_CHANNEL_2);
 		HAL_TIM_PWM_Start(&timer_PWM, TIM_CHANNEL_2);
 	}
@@ -71,10 +73,13 @@ TIM_HandleTypeDef Initialize_PWM(PWM_Out * PWMType)
 
 void PWM_adjust_DutyCycle(TIM_HandleTypeDef * pwmHandle, uint32_t Channel, float dutyCycle)
 {
-	if(dutyCycle > 100.0f)
-		dutyCycle = 100.0f;
-	if(dutyCycle < 0.0f)
-		dutyCycle = 0.0f;
+#define DUTY_LIM_H	95.0
+#define DUTY_LIM_L	5.0
+
+	if(dutyCycle > DUTY_LIM_H)
+		dutyCycle = DUTY_LIM_H;
+	if(dutyCycle < DUTY_LIM_L)
+		dutyCycle = DUTY_LIM_L;
 
 	float tempPulseWidth_us = ((float)(1000000/PWM_FREQ))*(dutyCycle/100.0f);
 
@@ -88,9 +93,7 @@ void PWM_adjust_PulseWidth(TIM_HandleTypeDef * pwmHandle, uint32_t Channel, floa
 	uint32_t counts_Ccr = CNTS_FROM_US(pulseWidth_us);
 
 	if(counts_Ccr > pwmHandle->Instance->ARR)
-	{
 		counts_Ccr = pwmHandle->Instance->ARR;
-	}
 
     /*Assign the new DC count to the capture compare register.*/
     switch(Channel)
@@ -171,7 +174,7 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* htim_pwm)
     __TIM1_CLK_ENABLE();
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
-    GPIO_InitStruct.Pin = GPIO_PIN_8;
+    GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;

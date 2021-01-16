@@ -6,7 +6,8 @@
 
 #define MSG_RATE_HZ(xxx) 	(SAMPLE_RATE / xxx)
 
-#define RX_BUFF_SZ 			4096
+#define RX_BUFF_SZ 			64
+#define TX_BUFF_SZ 			32
 
 #define CMD_SET_OUT_DAT 	0x01
 #define CMD_SET_OUT_RATE 	0x02
@@ -20,11 +21,13 @@
 #define SERIAL_CMD_END 		0xF7
 
 uint8_t *uartBuffer;
-uint8_t uartRx[RX_BUFF_SZ];
-uint8_t uartTx[RX_BUFF_SZ];
-uint8_t uartRxBuffer[1];
+uint8_t uartRxA[RX_BUFF_SZ];
+uint8_t uartRxB[RX_BUFF_SZ];
+uint8_t uartTx[TX_BUFF_SZ];
 
-uint16_t 	rxIndex;
+uint8_t 	rxIndexA;
+uint8_t 	rxIndexB;
+uint8_t 	rxBufferSwitch;
 uint16_t 	connLoss;
 uint8_t 	firstSync;
 uint16_t 	serialODR;
