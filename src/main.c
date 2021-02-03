@@ -78,6 +78,9 @@ static uint32_t timeElapUs 				= 0;
 static uint32_t timeElapMs 				= 0;
 static float 	timeElapMin 			= 0.0f;
 
+
+static int subbing = 0;
+
 PWM_Out PWMtimer;
 
 static int InitSamplingTimer(void);
@@ -101,8 +104,6 @@ int main(int argc, char* argv[])
 	setHighSystemClk();
 	HAL_Init();
 
-	InitPWMOutput();
-
 	InitSamplingTimer();
 	MX_TIM5_Init();
 
@@ -125,6 +126,7 @@ int main(int argc, char* argv[])
 	gLEDPins.Speed 	= GPIO_SPEED_HIGH;
 	HAL_GPIO_Init(LED_PORT, &gLEDPins);
 
+#if 0
 	// OUT_Z pin setup
 	GPIO_InitTypeDef gZPin;
 	gZPin.Pin 		= Z_INTERRUPT;
@@ -132,6 +134,8 @@ int main(int argc, char* argv[])
 	gZPin.Pull 		= GPIO_NOPULL;
 	gZPin.Speed 	= GPIO_SPEED_HIGH;
 	HAL_GPIO_Init(GPIOA, &gZPin);
+#endif
+
 	/* EXTI interrupt init*/
 	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
@@ -174,8 +178,10 @@ int main(int argc, char* argv[])
 
 
 	MX_GPIO_Init();
+	InitPWMOutput();
 	MX_DMA_Init();
 	MX_USART1_UART_Init();
+
 
 
 	HAL_StatusTypeDef hal_status = HAL_OK;
@@ -209,9 +215,42 @@ int main(int argc, char* argv[])
 //		update_display();
 
 //		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, q_time.Instance->CNT*(PULSE_NS_PER_CNT/100));
-		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_ALL, deltaDegrees);
-	}
 
+#define PI	3.141592654f
+		float sineMsA = 0.5f + 0.5f*sinf(((1*2*PI*(float)timeElapUs)/1000000.0f) + (0.0f));
+		float sineMsB = 0.5f + 0.5f*sinf(((.5*2*PI*(float)timeElapUs)/1000000.0f) + (2.0f*PI/3.0f));
+		float sineMsC = 0.5f + 0.5f*sinf(((.5*2*PI*(float)timeElapUs)/1000000.0f) + (4.0f*PI/3.0f));
+
+
+		static int subbingCnt = 0;
+		if(subbing == 0)
+			deltaDegrees += 0.010f;
+		else
+			deltaDegrees -= 0.010f;
+
+		if(deltaDegrees > 99.99f)
+		{
+			subbing = 1;
+		}
+		if(deltaDegrees < 0.00001f)
+		{
+			subbing = 0;
+			subbingCnt++;
+		}
+
+		if(subbing)
+		{
+			WritePin(LED_PORT, LED_A, GPIO_PIN_SET);
+		}
+		else
+		{
+			WritePin(LED_PORT, LED_A, GPIO_PIN_RESET);
+		}
+
+		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, sineMsA*100.0f);
+		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_2, sineMsB*25.0f);
+		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_3, sineMsC*25.0f);
+	}
 }
 
 /**
@@ -342,6 +381,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	timer9Count++;
 
 	timer9Divisor++;
+
 	if(timer9Divisor >= 25)
 	{
 		// 1000 ms tick
@@ -349,9 +389,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		timeElapMin		+= (0.001f/60.0f);
 		timer9Divisor 	= 0;
 
-		deltaDegrees 	= ((float)(int32_t)q_time.Instance->CNT * (360.0f / (6000.0f * 4.0f)));
-		degreesPsec = (deltaDegrees - deltaDegreesLast)/0.1f;
-		deltaDegreesLast = deltaDegrees;
+//		deltaDegrees 	= ((float)(int32_t)q_time.Instance->CNT * (360.0f / (6000.0f * 4.0f)));
+//		degreesPsec = (deltaDegrees - deltaDegreesLast)/0.1f;
+//		deltaDegreesLast = deltaDegrees;
+
 
 //		if(dma_rx_idx - dma_rx_idxLast > 0)
 //		{
@@ -377,6 +418,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		add_characters(str, 4);
 		update_display();
 		//update_LEDs();
+		// !ReadPin(LED_PORT, LED_A));
 	}
 }
 
