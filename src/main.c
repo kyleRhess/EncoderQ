@@ -48,8 +48,12 @@
 #include "Serial.h"
 #include "diag/Trace.h"
 #include "cmsis_device.h"
+#include "PID.h"
 
 TIM_HandleTypeDef q_time;
+
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
@@ -75,19 +79,28 @@ static TIM_HandleTypeDef SamplingTimer 	= { .Instance = TIM9 };
 static float deltaDegrees	 			= 0.0f;
 static float degreesPsec	 			= 0.0f;
 static uint32_t timeElapUs 				= 0;
-static uint32_t timeElapMs 				= 0;
-static float 	timeElapMin 			= 0.0f;
 
-
-static int subbing = 0;
-
+#define ADC_BUF_LEN 1
+volatile uint32_t g_ADCValue = 0;
+uint32_t g_ADCBuffer[ADC_BUF_LEN];
+volatile int m_bRunCurrentLoop = 0;
 PWM_Out PWMtimer;
+static float sineMsA = 0.0f;
+static float sineMsB = 0.0f;
+static float sineMsC = 0.0f;
+
+static PID_Controller pi_axis_d;
+static PID_Controller pi_axis_q;
+
+
 
 static int InitSamplingTimer(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM5_Init(void);
+static void MX_ADC1_Init(void);
+static void PWM_Monitor(float a, float b, float c);
 
 // Sample pragmas to cope with warnings. Please note the related line at
 // the end of this function, used to pop the compiler diagnostics status.
@@ -105,8 +118,7 @@ int main(int argc, char* argv[])
 	HAL_Init();
 
 	InitSamplingTimer();
-	MX_TIM5_Init();
-
+	//MX_TIM5_Init();
 
 //	InitSerial(115200, UART_STOPBITS_1, UART_WORDLENGTH_8B, UART_PARITY_NONE);
 
@@ -182,7 +194,7 @@ int main(int argc, char* argv[])
 	MX_DMA_Init();
 	MX_USART1_UART_Init();
 
-
+	MX_ADC1_Init();
 
 	HAL_StatusTypeDef hal_status = HAL_OK;
 	for (int i = 0; i < 2000; ++i)
@@ -193,64 +205,153 @@ int main(int argc, char* argv[])
 
 	hal_status = HAL_UART_Receive_DMA(&huart1, dma_buffer_rx, FULL_RX);
 
+//	HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, ADC_BUF_LEN);
+
+	PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, 0.50f);
+	PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_2, 0.50f);
+	PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_3, 0.50f);
+
+	HAL_ADC_Start(&hadc1);
+	HAL_ADC_PollForConversion(&hadc1, 1);
+	g_ADCBuffer[0] = HAL_ADC_GetValue(&hadc1);
+
+	pi_axis_d.kP = 0.001f;
+	pi_axis_d.kI = 0.0001f;
+	pi_axis_d.kD = 0.0f;
+	pi_axis_d.setPoint = 0.0f;
+	pi_axis_d.deltaTime = (1.0f / 1000.0f);
+	PID_Initialize(&pi_axis_d);
+	pi_axis_q.kP = 0.001f;
+	pi_axis_q.kI = 0.0001f;
+	pi_axis_q.kD = 0.0f;
+	pi_axis_q.setPoint = 20.0f;
+	pi_axis_q.deltaTime = (1.0f / 1000.0f);
+	PID_Initialize(&pi_axis_q);
+
 	while (1)
 	{
-		static char str[5] = {0, 0, 0, 0, 0};
-//		memset(str, 0, 5);
-//		sprintf(str, "%.2f", timeElapMin/60.0f);
-//		add_characters(str, 4);
-//		update_display();
+		HAL_ADC_Start(&hadc1);
+		HAL_ADC_PollForConversion(&hadc1, 1);
+		g_ADCBuffer[0] = HAL_ADC_GetValue(&hadc1);
 
-//		set_brightness(mapVal(deltaDegrees, 0.0f, 360.0f, 0.0f, 100.0f));
+#define PI			3.141592654f
+#define TWOPI		6.283185307f
+#define FOURPI		12.566370614f
+#define SHIFT_120	2.094395102f
+#define SHIFT_240 	4.188790205f
+
+		static float freq = 10.0f;
+		sineMsA = 0.5f + 0.5f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f));
+		sineMsB = 0.5f + 0.5f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_120);
+		sineMsC = 0.5f + 0.5f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_240);
+
+#define _PI_3				1.047197551f
+#define	SQRT_3				1.732050808f
+#define SQR_THREE_TWO 		0.866025404f
+#define ONE_THIRD			0.333333333f
+#define ONE_SQR_THREE		0.577350269f
+#define	V_SUPPLY			48.0f
+#define	DEG_RAD				0.017453293f
+		// fwd clark
+		float i_a 			= 10.0f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f));
+		float i_b 			= 10.0f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_120);
+		float i_c 			= -i_a - i_b;
+
+		float i_alpha 		= 1.5f * i_a;
+		float i_beta 		= SQR_THREE_TWO*i_b - SQR_THREE_TWO*i_c;
+
+		static float rotor_theta	= 0.0f;
+		float i_d 			= i_alpha*cosf(rotor_theta) + i_beta*sinf(rotor_theta);
+		float i_q 			= -i_alpha*sinf(rotor_theta) + i_beta*cosf(rotor_theta);
 
 
-		if(ReadPin(leds[3].iPort, leds[3].iName))
-			WritePin(leds[3].iPort, leds[3].iName, GPIO_PIN_RESET);
-		else
-			WritePin(leds[3].iPort, leds[3].iName, GPIO_PIN_SET);
-
-//		memset(str, 0, 4);
-//		sprintf(str, "%04X", (unsigned int)q_time.Instance->CNT);
-//		add_characters(str, 4);
-//		update_display();
-
-//		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, q_time.Instance->CNT*(PULSE_NS_PER_CNT/100));
-
-#define PI	3.141592654f
-		float sineMsA = 0.5f + 0.5f*sinf(((1*2*PI*(float)timeElapUs)/1000000.0f) + (0.0f));
-		float sineMsB = 0.5f + 0.5f*sinf(((.5*2*PI*(float)timeElapUs)/1000000.0f) + (2.0f*PI/3.0f));
-		float sineMsC = 0.5f + 0.5f*sinf(((.5*2*PI*(float)timeElapUs)/1000000.0f) + (4.0f*PI/3.0f));
-
-
-		static int subbingCnt = 0;
-		if(subbing == 0)
-			deltaDegrees += 0.010f;
-		else
-			deltaDegrees -= 0.010f;
-
-		if(deltaDegrees > 99.99f)
+		if(m_bRunCurrentLoop)
 		{
-			subbing = 1;
-		}
-		if(deltaDegrees < 0.00001f)
-		{
-			subbing = 0;
-			subbingCnt++;
-		}
+			rotor_theta += 0.2f;
 
-		if(subbing)
-		{
-			WritePin(LED_PORT, LED_A, GPIO_PIN_SET);
-		}
-		else
-		{
-			WritePin(LED_PORT, LED_A, GPIO_PIN_RESET);
-		}
+			PID_Update(&pi_axis_d, i_d);
+			PID_Update(&pi_axis_q, i_q);
 
-		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_1, sineMsA*100.0f);
-		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_2, sineMsB*25.0f);
-		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_3, sineMsC*25.0f);
+			float v_d 		= PID_GetOutput(&pi_axis_d);
+			float v_q 		= PID_GetOutput(&pi_axis_q);
+			float v_alpha 	= v_d*cosf(rotor_theta) - v_q*sinf(rotor_theta);
+			float v_beta 	= v_d*sinf(rotor_theta) + v_q*cosf(rotor_theta);
+			float v_a 		= 0.66666667f * v_alpha;
+			float v_b 		= -ONE_THIRD*v_alpha + ONE_SQR_THREE*v_beta;
+			float v_c 		= -ONE_THIRD*v_alpha - ONE_SQR_THREE*v_beta;
+
+			static float Uq = 0.0f;
+			Uq += 0.001f;
+			if(Uq >= 48.0f) Uq = 48.0f;
+
+			int sector = ((int)rotor_theta / 60.0f) + 1;
+
+			if(rotor_theta >= 360.0f)
+			{
+				rotor_theta = 0.0f;
+				sector = 1;
+			}
+
+			float alpha = rotor_theta - (sector-1)*60.0f;
+
+#define T	0.00002f
+			float T1 = Uq/48.0f * sinf((60.0f - alpha) * DEG_RAD);
+			float T2 = Uq/48.0f * sinf(alpha * DEG_RAD);
+			float T0 = 1 - T1 - T2;
+
+			float Ta,Tb,Tc;
+			switch(sector)
+			{
+				case 1:
+					Ta = T1 + T2 + T0/2;
+					Tb = T2 + T0/2;
+					Tc = T0/2;
+					break;
+				case 2:
+					Ta = T1 +  T0/2;
+					Tb = T1 + T2 + T0/2;
+					Tc = T0/2;
+					break;
+				case 3:
+					Ta = T0/2;
+					Tb = T1 + T2 + T0/2;
+					Tc = T2 + T0/2;
+					break;
+				case 4:
+					Ta = T0/2;
+					Tb = T1+ T0/2;
+					Tc = T1 + T2 + T0/2;
+					break;
+				case 5:
+					Ta = T2 + T0/2;
+					Tb = T0/2;
+					Tc = T1 + T2 + T0/2;
+					break;
+				case 6:
+					Ta = T1 + T2 + T0/2;
+					Tb = T0/2;
+					Tc = T1 + T0/2;
+					break;
+				default:
+					// possible error state
+					Ta = 0;
+					Tb = 0;
+					Tc = 0;
+			}
+
+
+			m_bRunCurrentLoop = 0;
+			PWM_Monitor(Ta, Tb, Tc);
+		}
 	}
+}
+
+static void PWM_Monitor(float a, float b, float c)
+{
+	static float pwm_duty = 1.0f;
+	PWM_Set_Duty(&PWMtimer.timer, TIM_CHANNEL_1, a);
+	PWM_Set_Duty(&PWMtimer.timer, TIM_CHANNEL_2, b);
+	PWM_Set_Duty(&PWMtimer.timer, TIM_CHANNEL_3, c);
 }
 
 /**
@@ -268,7 +369,7 @@ void EXTI9_5_IRQHandler(void)
  */
 int InitPWMOutput()
 {
-	PWMtimer.numChannels 	= 2;
+	PWMtimer.numChannels 	= 3;
 	PWMtimer.frequency 		= PWM_FREQ;
 	PWMtimer.TIM 			= TIM1;
 	PWMtimer.timer 			= Initialize_PWM(&PWMtimer);
@@ -281,39 +382,39 @@ int InitPWMOutput()
   * @param None
   * @retval None
   */
-static void MX_TIM5_Init(void)
-{
-	TIM_Encoder_InitTypeDef sConfig = {0};
-	TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-	q_time.Instance 			= TIM5;
-	q_time.Init.Prescaler 		= 0;
-	q_time.Init.CounterMode 	= TIM_COUNTERMODE_UP;
-	q_time.Init.Period 			= 0xFFFFFFFF;
-	q_time.Init.ClockDivision 	= TIM_CLOCKDIVISION_DIV1;
-	sConfig.EncoderMode 		= TIM_ENCODERMODE_TI12;
-	sConfig.IC1Polarity 		= TIM_ICPOLARITY_RISING;
-	sConfig.IC1Selection 		= TIM_ICSELECTION_DIRECTTI;
-	sConfig.IC1Prescaler 		= TIM_ICPSC_DIV1;
-	sConfig.IC1Filter 			= 0;
-	sConfig.IC2Polarity 		= TIM_ICPOLARITY_RISING;
-	sConfig.IC2Selection 		= TIM_ICSELECTION_DIRECTTI;
-	sConfig.IC2Prescaler 		= TIM_ICPSC_DIV1;
-	sConfig.IC2Filter 			= 0;
-
-	if (HAL_TIM_Encoder_Init(&q_time, &sConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	sMasterConfig.MasterOutputTrigger 	= TIM_TRGO_RESET;
-	sMasterConfig.MasterSlaveMode 		= TIM_MASTERSLAVEMODE_DISABLE;
-
-	if (HAL_TIMEx_MasterConfigSynchronization(&q_time, &sMasterConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-}
+//static void MX_TIM5_Init(void)
+//{
+//	TIM_Encoder_InitTypeDef sConfig = {0};
+//	TIM_MasterConfigTypeDef sMasterConfig = {0};
+//
+//	q_time.Instance 			= TIM5;
+//	q_time.Init.Prescaler 		= 0;
+//	q_time.Init.CounterMode 	= TIM_COUNTERMODE_UP;
+//	q_time.Init.Period 			= 0xFFFFFFFF;
+//	q_time.Init.ClockDivision 	= TIM_CLOCKDIVISION_DIV1;
+//	sConfig.EncoderMode 		= TIM_ENCODERMODE_TI12;
+//	sConfig.IC1Polarity 		= TIM_ICPOLARITY_RISING;
+//	sConfig.IC1Selection 		= TIM_ICSELECTION_DIRECTTI;
+//	sConfig.IC1Prescaler 		= TIM_ICPSC_DIV1;
+//	sConfig.IC1Filter 			= 0;
+//	sConfig.IC2Polarity 		= TIM_ICPOLARITY_RISING;
+//	sConfig.IC2Selection 		= TIM_ICSELECTION_DIRECTTI;
+//	sConfig.IC2Prescaler 		= TIM_ICPSC_DIV1;
+//	sConfig.IC2Filter 			= 0;
+//
+//	if (HAL_TIM_Encoder_Init(&q_time, &sConfig) != HAL_OK)
+//	{
+//		Error_Handler();
+//	}
+//
+//	sMasterConfig.MasterOutputTrigger 	= TIM_TRGO_RESET;
+//	sMasterConfig.MasterSlaveMode 		= TIM_MASTERSLAVEMODE_DISABLE;
+//
+//	if (HAL_TIMEx_MasterConfigSynchronization(&q_time, &sMasterConfig) != HAL_OK)
+//	{
+//		Error_Handler();
+//	}
+//}
 
 /**
   * @brief GPIO Initialization Function
@@ -331,7 +432,7 @@ static void MX_GPIO_Init(void)
 static int InitSamplingTimer()
 {
 	__HAL_RCC_TIM9_CLK_ENABLE();
-    SamplingTimer.Init.Prescaler 		= 49; // 5 kHz = 100E6/((250)*(80)*(1))
+    SamplingTimer.Init.Prescaler 		= 124; // 5 kHz = 100E6/((250)*(80)*(1))
     SamplingTimer.Init.CounterMode 		= TIM_COUNTERMODE_UP;
     SamplingTimer.Init.Period 			= 80; // 5 kHz = 100E6/((250)*(80)*(1))
     SamplingTimer.Init.ClockDivision 	= TIM_CLOCKDIVISION_DIV1;
@@ -377,11 +478,21 @@ static int timer9Count = 0;
 static float deltaDegreesLast = 0.0f;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	timeElapUs 		+= 40;
+	timeElapUs 		+= 100;
 	timer9Count++;
 
 	timer9Divisor++;
 
+
+	if(timer9Divisor >= 10)
+	{
+		timer9Divisor 	= 0;
+
+		if(!m_bRunCurrentLoop)
+			m_bRunCurrentLoop = 1;
+	}
+
+#if 0
 	if(timer9Divisor >= 25)
 	{
 		// 1000 ms tick
@@ -410,16 +521,24 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 //		{
 //			WritePin(leds[1].iPort, leds[1].iName, GPIO_PIN_RESET);
 //		}
+		uint32_t adc_sample = g_ADCValue;
+
+
 		uint8_t pd[4] = {0x12, 0x34, 0x56, 0x78};
-		HAL_UART_Transmit_DMA(&huart1, pd, 4);
+		memcpy(&pd, &adc_sample, 4);
 
 		static char str[5] = {0, 0, 0, 0, 0};
-		sprintf(str, "%.1f", deltaDegrees);
-		add_characters(str, 4);
-		update_display();
+		sprintf(str, "%.2f", (((float)adc_sample)/4096.0f)*3.3f);
+		HAL_UART_Transmit_DMA(&huart1, str, 5);
+
+//		static char str[5] = {0, 0, 0, 0, 0};
+//		sprintf(str, "%.1f", deltaDegrees);
+//		add_characters(str, 4);
+//		update_display();
 		//update_LEDs();
 		// !ReadPin(LED_PORT, LED_A));
 	}
+#endif
 }
 
 /**
@@ -441,6 +560,9 @@ static void MX_DMA_Init(void)
 	/* DMA2_Stream7_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 2, 0);
 	HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+
+//	HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 3, 0);
+//	HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 }
 
 static void MX_USART1_UART_Init(void)
@@ -543,18 +665,65 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 	__NOP();
 }
 
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+	  /* USER CODE BEGIN ADC1_Init 0 */
+
+	  /* USER CODE END ADC1_Init 0 */
+
+	  ADC_ChannelConfTypeDef sConfig = {0};
+
+	  /* USER CODE BEGIN ADC1_Init 1 */
+
+	  /* USER CODE END ADC1_Init 1 */
+	  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+	  */
+	  hadc1.Instance = ADC1;
+	  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+	  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+	  hadc1.Init.ScanConvMode = DISABLE;
+	  hadc1.Init.ContinuousConvMode = ENABLE;
+	  hadc1.Init.DiscontinuousConvMode = DISABLE;
+	  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+	  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T1_CC1;
+	  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	  hadc1.Init.NbrOfConversion = 1;
+	  hadc1.Init.DMAContinuousRequests = DISABLE;
+	  hadc1.Init.EOCSelection = DISABLE;
+	  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+	  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+	  */
+	  sConfig.Channel = ADC_CHANNEL_0;
+	  sConfig.Rank = 1;
+	  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
+	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+	  /* USER CODE BEGIN ADC1_Init 2 */
+
+	  /* USER CODE END ADC1_Init 2 */
+}
 
 
-
-
-
-
-
-
-
-
-
-
+//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+//{
+//	g_ADCValue = 0;
+//	for (int i = 0; i < ADC_BUF_LEN; ++i)
+//	{
+//		g_ADCValue += g_ADCBuffer[i];
+//	}
+//	g_ADCValue /= ADC_BUF_LEN;
+//	adcBufIdx = 0;
+//}
 
 
 

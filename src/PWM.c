@@ -21,7 +21,7 @@ TIM_HandleTypeDef Initialize_PWM(PWM_Out * PWMType)
 
 	timer_PWM.Instance 					= TIM;
 	timer_PWM.Init.Prescaler 			= PWM_PRESCALE;
-	timer_PWM.Init.CounterMode 			= TIM_COUNTERMODE_UP;
+	timer_PWM.Init.CounterMode 			= TIM_COUNTERMODE_CENTERALIGNED1;
 	timer_PWM.Init.Period 				= PWM_PERIOD;//PWM_STEPS - 1; // ARR -> counter max
 	timer_PWM.Init.ClockDivision 		= TIM_CLOCKDIVISION_DIV1;
 	timer_PWM.Init.RepetitionCounter 	= 0;
@@ -37,10 +37,10 @@ TIM_HandleTypeDef Initialize_PWM(PWM_Out * PWMType)
 	HAL_TIMEx_MasterConfigSynchronization(&timer_PWM, &master);
 
 
-	configOC.OCMode = TIM_OCMODE_PWM1;
+	configOC.OCMode = TIM_OCMODE_PWM2;
 	configOC.Pulse = 0;
-	configOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-	configOC.OCNPolarity = TIM_OCPOLARITY_LOW;
+	configOC.OCPolarity = TIM_OCPOLARITY_LOW;
+	configOC.OCNPolarity = TIM_OCPOLARITY_HIGH;
 	configOC.OCFastMode = TIM_OCFAST_DISABLE;
 	configOC.OCIdleState = TIM_OCIDLESTATE_RESET;
 	configOC.OCNIdleState = TIM_OCIDLESTATE_RESET;
@@ -54,7 +54,7 @@ TIM_HandleTypeDef Initialize_PWM(PWM_Out * PWMType)
 	sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
 	sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
 	sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-	sBreakDeadTimeConfig.DeadTime = 50;
+	sBreakDeadTimeConfig.DeadTime = 500 / 10;
 	sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
 	sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
 	sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
@@ -169,17 +169,17 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
 
 void PWM_adjust_DutyCycle(TIM_HandleTypeDef * pwmHandle, uint32_t Channel, float dutyCycle)
 {
-#define DUTY_LIM_H	96.0
-#define DUTY_LIM_L	100.0 - DUTY_LIM_H
+	dutyCycle = 1.0f - dutyCycle;
+#define FREQ_SCALE	1000000.0/PWM_FREQ
+#define DUTY_LIM_H	0.98
+#define DUTY_LIM_L	1.0 - DUTY_LIM_H
 
 	if(dutyCycle > DUTY_LIM_H)
 		dutyCycle = DUTY_LIM_H;
 	if(dutyCycle < DUTY_LIM_L)
 		dutyCycle = DUTY_LIM_L;
 
-	float tempPulseWidth_us = ((float)(1000000/PWM_FREQ))*(dutyCycle/100.0f);
-
-	PWM_adjust_PulseWidth(pwmHandle, Channel, tempPulseWidth_us);
+	PWM_adjust_PulseWidth(pwmHandle, Channel, (((float)FREQ_SCALE)*dutyCycle));
 }
 
 
@@ -190,6 +190,46 @@ void PWM_adjust_PulseWidth(TIM_HandleTypeDef * pwmHandle, uint32_t Channel, floa
 
 	if(counts_Ccr > pwmHandle->Instance->ARR)
 		counts_Ccr = pwmHandle->Instance->ARR;
+
+    /*Assign the new DC count to the capture compare register.*/
+    switch(Channel)
+    {
+		case TIM_CHANNEL_1:
+			pwmHandle->Instance->CCR1 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			break;
+
+		case TIM_CHANNEL_2:
+			pwmHandle->Instance->CCR2 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			break;
+
+		case TIM_CHANNEL_3:
+			pwmHandle->Instance->CCR3 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			break;
+
+		case TIM_CHANNEL_4:
+			pwmHandle->Instance->CCR4 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			break;
+
+		case TIM_CHANNEL_ALL:
+			pwmHandle->Instance->CCR1 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			pwmHandle->Instance->CCR2 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			pwmHandle->Instance->CCR3 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			pwmHandle->Instance->CCR4 = counts_Ccr;  /*Change CCR1 to appropriate channel, or pass it in with function.*/
+			break;
+
+    }
+}
+
+#define DEAD_TIME_BUF	(((DEAD_TIME / PULSE_NS_PER_CNT) / 2) + 1)
+void PWM_Set_Duty(TIM_HandleTypeDef * pwmHandle, uint32_t Channel, float dutyCycle)
+{
+	static uint32_t counts_Ccr = 0;
+	counts_Ccr = dutyCycle * pwmHandle->Instance->ARR;
+
+	if(counts_Ccr > pwmHandle->Instance->ARR - DEAD_TIME_BUF)
+		counts_Ccr = pwmHandle->Instance->ARR - DEAD_TIME_BUF;
+	else if(counts_Ccr < DEAD_TIME_BUF)
+		counts_Ccr = DEAD_TIME_BUF;
 
     /*Assign the new DC count to the capture compare register.*/
     switch(Channel)
