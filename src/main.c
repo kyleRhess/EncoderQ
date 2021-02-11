@@ -50,6 +50,21 @@
 #include "cmsis_device.h"
 #include "PID.h"
 
+#define PI					3.141592654f
+#define TWOPI				6.283185307f
+#define FOURPI				12.566370614f
+#define SHIFT_120			2.094395102f
+#define SHIFT_240 			4.188790205f
+#define _PI_3				1.047197551f // pi / 3
+#define	SQRT_3				1.732050808f // sqrt(3)
+#define SQR_THREE_TWO 		0.866025404f // sqrt(3) / 2
+#define ONE_THIRD			0.333333333f // 1 / 3
+#define ONE_SQR_THREE		0.577350269f // 1 / sqrt(3)
+#define	V_SUPPLY			48.0f		 //
+#define	DEG_RAD				0.017453293f // degrees to radians
+#define ONE_2PI				0.159154943f // 1 / (2pi)
+#define PI_2				1.570796327f // pi / 2
+
 TIM_HandleTypeDef q_time;
 
 ADC_HandleTypeDef hadc1;
@@ -85,9 +100,6 @@ volatile uint32_t g_ADCValue = 0;
 uint32_t g_ADCBuffer[ADC_BUF_LEN];
 volatile int m_bRunCurrentLoop = 0;
 PWM_Out PWMtimer;
-static float sineMsA = 0.0f;
-static float sineMsB = 0.0f;
-static float sineMsC = 0.0f;
 
 static PID_Controller pi_axis_d;
 static PID_Controller pi_axis_q;
@@ -100,7 +112,10 @@ static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_ADC1_Init(void);
+static void Run_SVM(void);
 static void PWM_Monitor(float a, float b, float c);
+static float sin_fast(float x);
+static float cos_fast(float x);
 
 // Sample pragmas to cope with warnings. Please note the related line at
 // the end of this function, used to pop the compiler diagnostics status.
@@ -234,124 +249,127 @@ int main(int argc, char* argv[])
 		HAL_ADC_PollForConversion(&hadc1, 1);
 		g_ADCBuffer[0] = HAL_ADC_GetValue(&hadc1);
 
-#define PI			3.141592654f
-#define TWOPI		6.283185307f
-#define FOURPI		12.566370614f
-#define SHIFT_120	2.094395102f
-#define SHIFT_240 	4.188790205f
-
-		static float freq = 10.0f;
-		sineMsA = 0.5f + 0.5f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f));
-		sineMsB = 0.5f + 0.5f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_120);
-		sineMsC = 0.5f + 0.5f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_240);
-
-#define _PI_3				1.047197551f
-#define	SQRT_3				1.732050808f
-#define SQR_THREE_TWO 		0.866025404f
-#define ONE_THIRD			0.333333333f
-#define ONE_SQR_THREE		0.577350269f
-#define	V_SUPPLY			48.0f
-#define	DEG_RAD				0.017453293f
-		// fwd clark
-		float i_a 			= 10.0f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f));
-		float i_b 			= 10.0f*sinf(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_120);
-		float i_c 			= -i_a - i_b;
-
-		float i_alpha 		= 1.5f * i_a;
-		float i_beta 		= SQR_THREE_TWO*i_b - SQR_THREE_TWO*i_c;
-
-		static float rotor_theta	= 0.0f;
-		float i_d 			= i_alpha*cosf(rotor_theta) + i_beta*sinf(rotor_theta);
-		float i_q 			= -i_alpha*sinf(rotor_theta) + i_beta*cosf(rotor_theta);
-
-
 		if(m_bRunCurrentLoop)
 		{
-			rotor_theta += 0.2f;
-
-			PID_Update(&pi_axis_d, i_d);
-			PID_Update(&pi_axis_q, i_q);
-
-			float v_d 		= PID_GetOutput(&pi_axis_d);
-			float v_q 		= PID_GetOutput(&pi_axis_q);
-			float v_alpha 	= v_d*cosf(rotor_theta) - v_q*sinf(rotor_theta);
-			float v_beta 	= v_d*sinf(rotor_theta) + v_q*cosf(rotor_theta);
-			float v_a 		= 0.66666667f * v_alpha;
-			float v_b 		= -ONE_THIRD*v_alpha + ONE_SQR_THREE*v_beta;
-			float v_c 		= -ONE_THIRD*v_alpha - ONE_SQR_THREE*v_beta;
-
-			static float Uq = 0.0f;
-			Uq += 0.001f;
-			if(Uq >= 48.0f) Uq = 48.0f;
-
-			int sector = ((int)rotor_theta / 60.0f) + 1;
-
-			if(rotor_theta >= 360.0f)
-			{
-				rotor_theta = 0.0f;
-				sector = 1;
-			}
-
-			float alpha = rotor_theta - (sector-1)*60.0f;
-
-#define T	0.00002f
-			float T1 = Uq/48.0f * sinf((60.0f - alpha) * DEG_RAD);
-			float T2 = Uq/48.0f * sinf(alpha * DEG_RAD);
-			float T0 = 1 - T1 - T2;
-
-			float Ta,Tb,Tc;
-			switch(sector)
-			{
-				case 1:
-					Ta = T1 + T2 + T0/2;
-					Tb = T2 + T0/2;
-					Tc = T0/2;
-					break;
-				case 2:
-					Ta = T1 +  T0/2;
-					Tb = T1 + T2 + T0/2;
-					Tc = T0/2;
-					break;
-				case 3:
-					Ta = T0/2;
-					Tb = T1 + T2 + T0/2;
-					Tc = T2 + T0/2;
-					break;
-				case 4:
-					Ta = T0/2;
-					Tb = T1+ T0/2;
-					Tc = T1 + T2 + T0/2;
-					break;
-				case 5:
-					Ta = T2 + T0/2;
-					Tb = T0/2;
-					Tc = T1 + T2 + T0/2;
-					break;
-				case 6:
-					Ta = T1 + T2 + T0/2;
-					Tb = T0/2;
-					Tc = T1 + T0/2;
-					break;
-				default:
-					// possible error state
-					Ta = 0;
-					Tb = 0;
-					Tc = 0;
-			}
-
-
 			m_bRunCurrentLoop = 0;
-			PWM_Monitor(Ta, Tb, Tc);
 		}
 	}
 }
 
+
+
+static void Run_SVM(void)
+{
+	static float freq = 10.0f;
+	static float rotor_theta	= 0.0f;
+	rotor_theta += 1.5f;
+
+	// forward clark
+	float i_a 			= 10.0f*sin_fast(((freq*TWOPI*(float)timeElapUs)/1000000.0f)); // measured value
+	float i_b 			= 10.0f*sin_fast(((freq*TWOPI*(float)timeElapUs)/1000000.0f) + SHIFT_120); // measured value
+	float i_c 			= -i_a - i_b;
+
+	float i_alpha 		= 1.5f * i_a;
+	float i_beta 		= SQR_THREE_TWO*i_b - SQR_THREE_TWO*i_c;
+
+	// forward park
+	float i_d 			= i_alpha*cos_fast(rotor_theta) + i_beta*sin_fast(rotor_theta);
+	float i_q 			= -i_alpha*sin_fast(rotor_theta) + i_beta*cos_fast(rotor_theta);
+
+	PID_Update(&pi_axis_d, i_d);
+	PID_Update(&pi_axis_q, i_q);
+
+	float v_d 		= PID_GetOutput(&pi_axis_d);
+	float v_q 		= PID_GetOutput(&pi_axis_q);
+	float v_alpha 	= v_d*cos_fast(rotor_theta) - v_q*sin_fast(rotor_theta);
+	float v_beta 	= v_d*sin_fast(rotor_theta) + v_q*cos_fast(rotor_theta);
+	float v_a 		= 0.66666667f * v_alpha;
+	float v_b 		= -ONE_THIRD*v_alpha + ONE_SQR_THREE*v_beta;
+	float v_c 		= -ONE_THIRD*v_alpha - ONE_SQR_THREE*v_beta;
+
+	static float Uq = 0.0f;
+	Uq += 0.001f;
+	if(Uq >= 48.0f) Uq = 48.0f;
+
+	int sector = ((int)rotor_theta / 60.0f) + 1;
+
+	if(rotor_theta >= 360.0f)
+	{
+		rotor_theta = 0.0f;
+		sector = 1;
+	}
+
+	float alpha = rotor_theta - (sector-1)*60.0f;
+
+	float T1 = Uq/48.0f * sin_fast((60.0f - alpha) * DEG_RAD);
+	float T2 = Uq/48.0f * sin_fast(alpha * DEG_RAD);
+	float T0 = 1 - T1 - T2;
+
+	float Ta,Tb,Tc;
+	// sector should come from hall sensors or encoder
+	switch(sector)
+	{
+		case 1:
+			Ta = T1 + T2 + T0/2;
+			Tb = T2 + T0/2;
+			Tc = T0/2;
+			break;
+		case 2:
+			Ta = T1 +  T0/2;
+			Tb = T1 + T2 + T0/2;
+			Tc = T0/2;
+			break;
+		case 3:
+			Ta = T0/2;
+			Tb = T1 + T2 + T0/2;
+			Tc = T2 + T0/2;
+			break;
+		case 4:
+			Ta = T0/2;
+			Tb = T1+ T0/2;
+			Tc = T1 + T2 + T0/2;
+			break;
+		case 5:
+			Ta = T2 + T0/2;
+			Tb = T0/2;
+			Tc = T1 + T2 + T0/2;
+			break;
+		case 6:
+			Ta = T1 + T2 + T0/2;
+			Tb = T0/2;
+			Tc = T1 + T0/2;
+			break;
+		default:
+			// possible error state
+			Ta = 0;
+			Tb = 0;
+			Tc = 0;
+	}
+
+	PWM_Monitor(Ta, Tb, Tc);
+}
+
 static void PWM_Monitor(float a, float b, float c)
 {
-	static float pwm_duty = 1.0f;
 	PWM_Set_Duty(&PWMtimer.timer, TIM_CHANNEL_1, a);
 	PWM_Set_Duty(&PWMtimer.timer, TIM_CHANNEL_2, b);
 	PWM_Set_Duty(&PWMtimer.timer, TIM_CHANNEL_3, c);
+}
+
+static float sin_fast(float x)
+{
+	float t = x * ONE_2PI;
+	t = t - (int)t;
+
+	if(t < 0.5f)
+		return -16.0f*(t*t) + 8*t;
+	else
+		return 16.0f*(t*t) - 16*t - 8*t + 8;
+}
+
+static float cos_fast(float x)
+{
+	sin_fast(x + PI_2);
 }
 
 /**
@@ -487,6 +505,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(timer9Divisor >= 10)
 	{
 		timer9Divisor 	= 0;
+
+		Run_SVM();
 
 		if(!m_bRunCurrentLoop)
 			m_bRunCurrentLoop = 1;
