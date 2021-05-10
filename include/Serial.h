@@ -2,54 +2,53 @@
 #define SERIAL_H_
 
 #include <stdio.h>
-#include "stm32f4xx.h"
+#include <stdlib.h>
+#include <string.h>
 
-#define MSG_RATE_HZ(xxx) 	(SAMPLE_RATE / xxx)
+#include "system.h"
 
-#define RX_BUFF_SZ 			64
-#define TX_BUFF_SZ 			32
+#define MSG_RATE_HZ(xxx) 		(SAMPLE_RATE / xxx)
 
-#define CMD_SET_OUT_DAT 	0x01
-#define CMD_SET_OUT_RATE 	0x02
-#define CMD_SET_PID_GAIN 	0x03
+#define RX_BUFF_SZ 				34
+#define TX_BUFF_SZ 				34
 
-#define SERIAL_MSG_DRONE 	0x01
-#define SERIAL_MSG_GPS	 	0x02
+#define START_CHAR 				0xAA
 
-#define SERIAL_MSG_START 	0x4A
-#define SERIAL_CMD_START 	0x7F
-#define SERIAL_CMD_END 		0xF7
+#define CMD_SET_OUT_DAT 		0x01
+#define CMD_SET_OUT_RATE 		0x02
+#define CMD_SET_PID_GAIN 		0x03
 
-uint8_t *uartBuffer;
-uint8_t uartRxA[RX_BUFF_SZ];
-uint8_t uartRxB[RX_BUFF_SZ];
-uint8_t uartTx[TX_BUFF_SZ];
+#define CMD_MOTOR_ENABLE		0x00000001
+#define CMD_MOTOR_DISABLE		0x00000002
+#define CMD_MOTOR_SPEED			0x00000004
+#define CMD_MOTOR_MODE			0x00000008
+#define CMD_MOTOR_QUERY			0x00000010
+#define CMD_MOTOR_RESET			0x00000020
+#define CMD_MOTOR_POSITION		0x00000040
+#define CMD_MOTOR_PARMS			0x00000080
+#define CMD_MOTOR_HOME			0x00000100
+#define CMD_MOTOR_HEARTBEAT		0x00000200
+#define CMD_MOTOR_CRUISE		0x00000400
 
-uint8_t 	rxIndexA;
-uint8_t 	rxIndexB;
-uint8_t 	rxBufferSwitch;
-uint16_t 	connLoss;
-uint8_t 	firstSync;
-uint16_t 	serialODR;
-uint8_t 	serialMSG;
-uint8_t		handshakeCMD;
 
-struct DataMsg {
-	uint8_t start;
-	uint8_t msgCnt;
-	uint32_t dat[7];
-	uint8_t statusA;
-	uint8_t statusB;
-	uint8_t cksum;
-} __attribute__((__packed__));
+typedef struct DataFields
+{
+	float		torqueValue; 	// 1
+	float		speedValue;		// 2
+	float		posValue;		// 3
+	uint32_t	driveMode;		// 4
+	uint32_t	millis;			// 5
+	uint8_t		parmID;			// 6
+	float		parmValue;		// 7
+} __attribute__((__packed__)) DataFields;
 
-struct DataMsg datMsg;
+int Serial_InitPort(uint32_t baudrate, uint32_t stopbits, uint32_t datasize, uint32_t parity);
+void Serial_RxData(uint16_t Size);
+void Serial_TxData(uint16_t Size);
+int Serial_WaitingForAck(void);
 
-int InitSerial(uint32_t baudrate, uint32_t stopbits, uint32_t datasize, uint32_t parity);
-void transmitSerialData(void);
-uint8_t calcCRC(uint8_t datArr[], size_t size);
-float toFloat(uint8_t bytes[], int startI);
-void decodePIDGains(uint8_t *payload);
+int WaitForAck(uint32_t cmd);
+int SendCommand(uint32_t cmd);
 
 
 #endif /* SERIAL_H_ */

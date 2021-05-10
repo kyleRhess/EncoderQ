@@ -43,22 +43,16 @@
 #include "system.h"
 #include "PWM.h"
 #include "SPI.h"
+#include "clock.h"
 #include "hcms.h"
 #include "characters.h"
-#include "Serial.h"
+#include "serial.h"
 #include "diag/Trace.h"
 #include "cmsis_device.h"
 
-TIM_HandleTypeDef q_time;
-
-UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart1 = { .Instance = USART1 };
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
-
-#define FULL_RX 64
-#define HALF_RX FULL_RX / 2
-uint8_t dma_buffer_tx[2048];
-uint8_t dma_buffer_rx[2048];
 
 typedef struct _LED_Status
 {
@@ -71,20 +65,12 @@ typedef struct _LED_Status
 }LED_Status;
 static LED_Status leds[4];
 
-static TIM_HandleTypeDef SamplingTimer 	= { .Instance = TIM9 };
-static float deltaDegrees	 			= 0.0f;
-static float degreesPsec	 			= 0.0f;
-static uint32_t timeElapUs 				= 0;
-static uint32_t timeElapMs 				= 0;
-static float 	timeElapMin 			= 0.0f;
+static ClockTimerus transmitTimer;
 
 PWM_Out PWMtimer;
 
-static int InitSamplingTimer(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_USART1_UART_Init(void);
-static void MX_TIM5_Init(void);
 
 // Sample pragmas to cope with warnings. Please note the related line at
 // the end of this function, used to pop the compiler diagnostics status.
@@ -101,16 +87,9 @@ int main(int argc, char* argv[])
 	setHighSystemClk();
 	HAL_Init();
 
-	InitPWMOutput();
-
 	InitSamplingTimer();
-	MX_TIM5_Init();
 
-
-//	InitSerial(115200, UART_STOPBITS_1, UART_WORDLENGTH_8B, UART_PARITY_NONE);
-
-
-	HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn, 1, 0);
+	HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
 
 	RCC->AHB1ENR 	= RCC_AHB1ENR_GPIOCEN;
@@ -125,24 +104,9 @@ int main(int argc, char* argv[])
 	gLEDPins.Speed 	= GPIO_SPEED_HIGH;
 	HAL_GPIO_Init(LED_PORT, &gLEDPins);
 
-	// OUT_Z pin setup
-	GPIO_InitTypeDef gZPin;
-	gZPin.Pin 		= Z_INTERRUPT;
-	gZPin.Mode 		= GPIO_MODE_IT_RISING;
-	gZPin.Pull 		= GPIO_NOPULL;
-	gZPin.Speed 	= GPIO_SPEED_HIGH;
-	HAL_GPIO_Init(GPIOA, &gZPin);
-	/* EXTI interrupt init*/
-	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
 	init_display();
 
-
-	HAL_TIM_Encoder_Start(&q_time, TIM_CHANNEL_ALL);
-
 	set_brightness(10.0f);
-
 
 	for (int i = 0; i < 4; ++i)
 	{
@@ -173,23 +137,25 @@ int main(int argc, char* argv[])
 	leds[3].iLEDCountdownOn = 25;
 
 
-	MX_GPIO_Init();
 	MX_DMA_Init();
-	MX_USART1_UART_Init();
+	MX_GPIO_Init();
+
+	// Setup serial interface
+	Serial_InitPort(921600, UART_STOPBITS_1, UART_WORDLENGTH_8B, UART_PARITY_NONE);
+	Serial_RxData(RX_BUFF_SZ);
 
 
-	HAL_StatusTypeDef hal_status = HAL_OK;
-	for (int i = 0; i < 2000; ++i)
-	{
-		dma_buffer_tx[i] = 0;
-		dma_buffer_rx[i] = 0;
-	}
+	static uint32_t cmdSeq[2] = {
+			CMD_MOTOR_HEARTBEAT,
+			CMD_MOTOR_SPEED
+	};
 
-	hal_status = HAL_UART_Receive_DMA(&huart1, dma_buffer_rx, FULL_RX);
+
+
+	Clock_StartTimerUs(&transmitTimer, 10000);
 
 	while (1)
 	{
-		static char str[5] = {0, 0, 0, 0, 0};
 //		memset(str, 0, 5);
 //		sprintf(str, "%.2f", timeElapMin/60.0f);
 //		add_characters(str, 4);
@@ -203,77 +169,30 @@ int main(int argc, char* argv[])
 		else
 			WritePin(leds[3].iPort, leds[3].iName, GPIO_PIN_SET);
 
+
+		static char str[5] = {0, 0, 0, 0, 0};
+		sprintf(str, "%d", Clock_GetMs()/10);
+		add_characters(str, 4);
+		update_display();
+
+		static int cmdToSend = 0;
+		if(Clock_UpdateTimerUs(&transmitTimer))
+		{
+			if(!Serial_WaitingForAck())
+			{
+				SendCommand(cmdSeq[cmdToSend++]);
+				if(cmdToSend >= sizeof(cmdSeq)/sizeof(cmdSeq[0]))
+					cmdToSend = 0;
+			}
+		}
+
+
 //		memset(str, 0, 4);
 //		sprintf(str, "%04X", (unsigned int)q_time.Instance->CNT);
 //		add_characters(str, 4);
 //		update_display();
-
-//		PWM_adjust_PulseWidth(&PWMtimer.timer, TIM_CHANNEL_1, q_time.Instance->CNT*(PULSE_NS_PER_CNT/100));
-		PWM_adjust_DutyCycle(&PWMtimer.timer, TIM_CHANNEL_ALL, deltaDegrees);
 	}
 
-}
-
-/**
-* @brief This function handles EXTI line0.
-*/
-void EXTI9_5_IRQHandler(void)
-{
-	HAL_GPIO_EXTI_IRQHandler(Z_INTERRUPT);
-//	WritePin(LED_PORT, LED_D, !ReadPin(LED_PORT, LED_D));
-//	q_time.Instance->CNT = 0;
-}
-
-/*
- * Timer used for motor ESC control
- */
-int InitPWMOutput()
-{
-	PWMtimer.numChannels 	= 2;
-	PWMtimer.frequency 		= PWM_FREQ;
-	PWMtimer.TIM 			= TIM1;
-	PWMtimer.timer 			= Initialize_PWM(&PWMtimer);
-
-	return HAL_OK;
-}
-
-/**
-  * @brief TIM5 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM5_Init(void)
-{
-	TIM_Encoder_InitTypeDef sConfig = {0};
-	TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-	q_time.Instance 			= TIM5;
-	q_time.Init.Prescaler 		= 0;
-	q_time.Init.CounterMode 	= TIM_COUNTERMODE_UP;
-	q_time.Init.Period 			= 0xFFFFFFFF;
-	q_time.Init.ClockDivision 	= TIM_CLOCKDIVISION_DIV1;
-	sConfig.EncoderMode 		= TIM_ENCODERMODE_TI12;
-	sConfig.IC1Polarity 		= TIM_ICPOLARITY_RISING;
-	sConfig.IC1Selection 		= TIM_ICSELECTION_DIRECTTI;
-	sConfig.IC1Prescaler 		= TIM_ICPSC_DIV1;
-	sConfig.IC1Filter 			= 0;
-	sConfig.IC2Polarity 		= TIM_ICPOLARITY_RISING;
-	sConfig.IC2Selection 		= TIM_ICSELECTION_DIRECTTI;
-	sConfig.IC2Prescaler 		= TIM_ICPSC_DIV1;
-	sConfig.IC2Filter 			= 0;
-
-	if (HAL_TIM_Encoder_Init(&q_time, &sConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	sMasterConfig.MasterOutputTrigger 	= TIM_TRGO_RESET;
-	sMasterConfig.MasterSlaveMode 		= TIM_MASTERSLAVEMODE_DISABLE;
-
-	if (HAL_TIMEx_MasterConfigSynchronization(&q_time, &sMasterConfig) != HAL_OK)
-	{
-		Error_Handler();
-	}
 }
 
 /**
@@ -289,25 +208,16 @@ static void MX_GPIO_Init(void)
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 }
 
-static int InitSamplingTimer()
+static void MX_DMA_Init(void)
 {
-	__HAL_RCC_TIM9_CLK_ENABLE();
-    SamplingTimer.Init.Prescaler 		= 49; // 5 kHz = 100E6/((250)*(80)*(1))
-    SamplingTimer.Init.CounterMode 		= TIM_COUNTERMODE_UP;
-    SamplingTimer.Init.Period 			= 80; // 5 kHz = 100E6/((250)*(80)*(1))
-    SamplingTimer.Init.ClockDivision 	= TIM_CLOCKDIVISION_DIV1;
+	__HAL_RCC_DMA2_CLK_ENABLE();
 
-    if(HAL_TIM_Base_Init(&SamplingTimer) != HAL_OK)
-    	return HAL_ERROR;
+	HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 2, 0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 
-    if(HAL_TIM_Base_Start_IT(&SamplingTimer) != HAL_OK)
-    	return HAL_ERROR;
-
-    return HAL_OK;
+	HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 2, 0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 }
-
-void TIM1_BRK_TIM9_IRQHandler(void) { HAL_TIM_IRQHandler(&SamplingTimer); }
-
 
 static void update_LEDs( void )
 {
@@ -333,188 +243,12 @@ static void update_LEDs( void )
 	}
 }
 
-static int timer9Divisor = 0;
-static int timer9Count = 0;
-static float deltaDegreesLast = 0.0f;
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	timeElapUs 		+= 40;
-	timer9Count++;
-
-	timer9Divisor++;
-	if(timer9Divisor >= 25)
-	{
-		// 1000 ms tick
-		timeElapMs 		+= 1;
-		timeElapMin		+= (0.001f/60.0f);
-		timer9Divisor 	= 0;
-
-		deltaDegrees 	= ((float)(int32_t)q_time.Instance->CNT * (360.0f / (6000.0f * 4.0f)));
-		degreesPsec = (deltaDegrees - deltaDegreesLast)/0.1f;
-		deltaDegreesLast = deltaDegrees;
-
-//		if(dma_rx_idx - dma_rx_idxLast > 0)
-//		{
-//			WritePin(leds[0].iPort, leds[0].iName, GPIO_PIN_SET);
-//		}
-//		else
-//		{
-//			WritePin(leds[0].iPort, leds[0].iName, GPIO_PIN_RESET);
-//		}
-//		if(dma_tx_idx - dma_tx_idxLast > 0)
-//		{
-//			WritePin(leds[1].iPort, leds[1].iName, GPIO_PIN_SET);
-//		}
-//		else
-//		{
-//			WritePin(leds[1].iPort, leds[1].iName, GPIO_PIN_RESET);
-//		}
-		uint8_t pd[4] = {0x12, 0x34, 0x56, 0x78};
-		HAL_UART_Transmit_DMA(&huart1, pd, 4);
-
-		static char str[5] = {0, 0, 0, 0, 0};
-		sprintf(str, "%.1f", deltaDegrees);
-		add_characters(str, 4);
-		update_display();
-		//update_LEDs();
-	}
-}
-
-/**
-  * Enable DMA controller clock
-  * Configure DMA for memory to memory transfers
-  *   hdma_memtomem_dma2_stream0
-  *   hdma_memtomem_dma2_stream1
-  */
-static void MX_DMA_Init(void)
-{
-	/* DMA controller clock enable */
-	__HAL_RCC_DMA2_CLK_ENABLE();
-
-	/* DMA interrupt init */
-	/* DMA2_Stream2_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 2, 0);
-	HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
-
-	/* DMA2_Stream7_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 2, 0);
-	HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
-}
-
-static void MX_USART1_UART_Init(void)
-{
-	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 115200;
-	huart1.Init.WordLength = UART_WORDLENGTH_8B;
-	huart1.Init.StopBits = UART_STOPBITS_1;
-	huart1.Init.Parity = UART_PARITY_NONE;
-	huart1.Init.Mode = UART_MODE_TX_RX;
-	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-	if (HAL_UART_Init(&huart1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-}
-
 /******************************************************************************/
 /* STM32F4xx Peripheral Interrupt Handlers                                    */
 /* Add here the Interrupt Handlers for the used peripherals.                  */
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
-
-/**
-  * @brief This function handles USART1 global interrupt.
-  */
-void USART1_IRQHandler(void)
-{
-  HAL_UART_IRQHandler(&huart1);
-}
-
-/**
-  * @brief This function handles DMA2 stream2 global interrupt.
-  */
-void DMA2_Stream2_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(&hdma_usart1_rx);
-}
-
-/**
-  * @brief This function handles DMA2 stream7 global interrupt.
-  */
-void DMA2_Stream7_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(&hdma_usart1_tx);
-}
-
-
-/* USER CODE BEGIN 1 */
-/*
- * UART Interrupts
- */
-
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
-{
-	if(UartHandle->hdmatx->ErrorCode == HAL_DMA_ERROR_FE)
-	{
-		// Since FIFO mode disabled, just ignore this error
-		__NOP();
-	}
-	else
-	{
-		WritePin(leds[3].iPort, leds[3].iName, GPIO_PIN_SET);
-		if(__HAL_UART_GET_FLAG(UartHandle, UART_FLAG_ORE) != RESET)
-		{
-			if(__HAL_UART_GET_FLAG(UartHandle, UART_FLAG_RXNE) == RESET)
-				UartHandle->Instance->DR;
-		}
-	}
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	memcpy(&dma_buffer_tx[0], &dma_buffer_rx[HALF_RX], HALF_RX);
-	HAL_UART_Transmit_DMA(&huart1, &dma_buffer_tx[0], HALF_RX);
-
-	HAL_UART_Receive_DMA(&huart1, &dma_buffer_rx[0], FULL_RX);
-}
-
-void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
-{
-	memcpy(&dma_buffer_tx[0], &dma_buffer_rx[0], HALF_RX);
-	HAL_UART_Transmit_DMA(&huart1, &dma_buffer_tx[0], HALF_RX);
-}
-
-void UART_DMATransmitCplt(DMA_HandleTypeDef *hdma)
-{
-	__NOP();
-}
-
-void HAL_UART_TxHalfCpltCallback(UART_HandleTypeDef *huart)
-{
-	__NOP();
-}
-
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-	__NOP();
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
