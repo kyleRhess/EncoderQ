@@ -9,7 +9,7 @@ static UART_HandleTypeDef 	s_UARTHandle = { .Instance = USART1 };
 static DMA_HandleTypeDef 	hdma_usart1_rx;
 static DMA_HandleTypeDef 	hdma_usart1_tx;
 
-static uint8_t 				uartRxBuff[RX_BUFF_SZ];
+static uint8_t 				uartRxBuff[RX_BUFF_SZ*10];
 static uint8_t 				uartTxBuff[TX_BUFF_SZ];
 
 static DataFields 			txCmdData;
@@ -17,6 +17,9 @@ static DataFields 			rxCmdData;
 
 static uint32_t 			ackCmdmsg = 0;
 static int					isWaitingForAck = 0;
+
+static uint32_t 			rIdx = 0;
+static uint32_t 			wIdx = 0;
 
 static uint32_t crc32_for_byte(uint32_t r)
 {
@@ -35,7 +38,7 @@ static void crc32(const void *data, size_t n_bytes, uint32_t* crc)
     *crc = table[(uint8_t)*crc ^ ((uint8_t*)data)[i]] ^ *crc >> 8;
 }
 
-int SendCommand(uint32_t cmd)
+int Serial_SendCommand(uint32_t cmd)
 {
 	uint32_t thiscrc = 0;
 	memset(&uartTxBuff[0], 0, sizeof(uartTxBuff));
@@ -90,7 +93,7 @@ int Serial_InitPort(uint32_t baudrate, uint32_t stopbits, uint32_t datasize, uin
 
 void Serial_RxData(uint16_t Size)
 {
-	HAL_UART_Receive_DMA(&s_UARTHandle, uartRxBuff, Size);
+	HAL_UART_Receive_DMA(&s_UARTHandle, &uartRxBuff[rIdx], Size);
 }
 
 void Serial_TxData(uint16_t Size)
@@ -105,6 +108,10 @@ int Serial_WaitingForAck()
 	{
 		timeout = 100;
 		isWaitingForAck = 0;
+
+		HAL_UART_DeInit(&s_UARTHandle);
+		HAL_UART_Init(&s_UARTHandle);
+		HAL_UART_Receive_DMA(&s_UARTHandle, &uartRxBuff[rIdx], RX_BUFF_SZ);
 	}
 	else if(isWaitingForAck)
 	{
@@ -112,6 +119,16 @@ int Serial_WaitingForAck()
 	}
 
 	return isWaitingForAck;
+}
+
+DataFields* Serial_GetResponse(void)
+{
+	return &rxCmdData;
+}
+
+DataFields* Serial_GetTransmit(void)
+{
+	return &txCmdData;
 }
 
 /* USER CODE BEGIN 1 */
@@ -125,32 +142,40 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	uint32_t rxCrc = 0;
 
 	// start, data...data, checksum
-	if(uartRxBuff[0] == START_CHAR)
+	while(uartRxBuff[rIdx] != START_CHAR && rIdx < (sizeof(uartRxBuff)/sizeof(uartRxBuff[0]))-RX_BUFF_SZ)
+	{
+		rIdx++;
+	}
+
+	if(uartRxBuff[rIdx] == START_CHAR)
 	{
 		// Compute 32-bit CRC
-		crc32(&uartRxBuff[0], RX_BUFF_SZ-4, &thiscrc);
+		crc32(&uartRxBuff[rIdx], RX_BUFF_SZ-4, &thiscrc);
 
 		// Get CRC from message
-		rxCrc = (uartRxBuff[RX_BUFF_SZ - 1] << 24) |
-				(uartRxBuff[RX_BUFF_SZ - 2] << 16) |
-				(uartRxBuff[RX_BUFF_SZ - 3] << 8) |
-				(uartRxBuff[RX_BUFF_SZ - 4] << 0);
+		rxCrc = (uartRxBuff[rIdx+RX_BUFF_SZ - 1] << 24) |
+				(uartRxBuff[rIdx+RX_BUFF_SZ - 2] << 16) |
+				(uartRxBuff[rIdx+RX_BUFF_SZ - 3] << 8) |
+				(uartRxBuff[rIdx+RX_BUFF_SZ - 4] << 0);
 
 		// Compare CRC's
 		if(thiscrc == rxCrc && rxCrc != 0)
 		{
 			uint32_t ackmsg = 0;
-			memcpy(&ackmsg, &uartRxBuff[1], 4);
+			memcpy(&ackmsg, &uartRxBuff[rIdx+1], 4);
 			if(ackmsg == ackCmdmsg)
 			{
 				// Copy status data over
-				memcpy(&rxCmdData, &uartRxBuff[1 + 4], sizeof(rxCmdData));
+				memcpy(&rxCmdData, &uartRxBuff[rIdx+1 + 4], sizeof(rxCmdData));
 				isWaitingForAck = 0;
 			}
 		}
 	}
 
-	HAL_UART_Receive_DMA(huart, &uartRxBuff[0], RX_BUFF_SZ);
+	if(rIdx >= (sizeof(uartRxBuff)/sizeof(uartRxBuff[0]))-RX_BUFF_SZ)
+		rIdx = 0;
+
+	HAL_UART_Receive_DMA(huart, &uartRxBuff[rIdx], RX_BUFF_SZ);
 }
 
 #if 0

@@ -11,15 +11,19 @@
 #define UART_TX_PIN			GPIO_PIN_6
 #define UART_RX_PIN			GPIO_PIN_7
 
+#define ADC_PORT			GPIOA
+#define ADC_THROTTLE		GPIO_PIN_5
+
+#define POWER_SW_PORT		GPIOA
+#define POWER_SW_PIN		GPIO_PIN_7
+
 #include "stm32f4xx_hal.h"
-
-
+#include "signal.h"
 
 void WritePin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIO_PinState PinState);
 uint8_t ReadPin(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
 
 float mapVal(float x, float in_min, float in_max, float out_min, float out_max);
-
 
 
 #endif /* SYSTEM_H_ */

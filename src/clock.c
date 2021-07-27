@@ -1,6 +1,7 @@
 
 
 #include "clock.h"
+#include "adc.h"
 
 // Background timer for keeping time (25kHz)
 static TIM_HandleTypeDef SamplingTimer 	= { .Instance = TIM9 };
@@ -79,6 +80,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	timeElapUs 		+= 40;
 	timer9Count++;
+
+	hadc1.Instance->CR2 |= ADC_CR2_SWSTART;
 
 	timer9Divisor++;
 	if(timer9Divisor >= 25)

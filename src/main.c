@@ -42,11 +42,13 @@
 #include "main.h"
 #include "system.h"
 #include "PWM.h"
+#include "adc.h"
 #include "SPI.h"
 #include "clock.h"
 #include "hcms.h"
 #include "characters.h"
 #include "serial.h"
+#include "signal.h"
 #include "diag/Trace.h"
 #include "cmsis_device.h"
 
@@ -65,9 +67,10 @@ typedef struct _LED_Status
 }LED_Status;
 static LED_Status leds[4];
 
+static int seconds = 0;
 static ClockTimerus transmitTimer;
-
-PWM_Out PWMtimer;
+static ClockTimer secTimer;
+static ClockTimer screenTimer;
 
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
@@ -84,7 +87,7 @@ static void setHighSystemClk(void);
 int main(int argc, char* argv[])
 {
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	setHighSystemClk();
+ 	setHighSystemClk();
 	HAL_Init();
 
 	InitSamplingTimer();
@@ -103,6 +106,14 @@ int main(int argc, char* argv[])
 	gLEDPins.Pull 	= GPIO_PULLUP;
 	gLEDPins.Speed 	= GPIO_SPEED_HIGH;
 	HAL_GPIO_Init(LED_PORT, &gLEDPins);
+
+	// POWER_SW pin setup
+	GPIO_InitTypeDef gPwrPin;
+	gPwrPin.Pin 	= POWER_SW_PIN;
+	gPwrPin.Mode 	= GPIO_MODE_INPUT;
+	gPwrPin.Pull 	= GPIO_PULLDOWN;
+	gPwrPin.Speed 	= GPIO_SPEED_HIGH;
+	HAL_GPIO_Init(POWER_SW_PORT, &gPwrPin);
 
 	init_display();
 
@@ -141,58 +152,158 @@ int main(int argc, char* argv[])
 	MX_GPIO_Init();
 
 	// Setup serial interface
-	Serial_InitPort(921600, UART_STOPBITS_1, UART_WORDLENGTH_8B, UART_PARITY_NONE);
+	Serial_InitPort(115200, UART_STOPBITS_1, UART_WORDLENGTH_8B, UART_PARITY_NONE);
 	Serial_RxData(RX_BUFF_SZ);
 
+	// Start ADC + DMA before base PWM timer
+	ADC_Init();
 
 	static uint32_t cmdSeq[2] = {
 			CMD_MOTOR_HEARTBEAT,
-			CMD_MOTOR_SPEED
+			CMD_MOTOR_TORQUE
 	};
+	static uint32_t	nextCmd = CMD_MOTOR_RESET;
 
-
-
+	Clock_StartTimer(&secTimer, 1000);
+	Clock_StartTimer(&screenTimer, 8);
 	Clock_StartTimerUs(&transmitTimer, 10000);
 
 	while (1)
 	{
-//		memset(str, 0, 5);
-//		sprintf(str, "%.2f", timeElapMin/60.0f);
-//		add_characters(str, 4);
-//		update_display();
-
-//		set_brightness(mapVal(deltaDegrees, 0.0f, 360.0f, 0.0f, 100.0f));
-
-
 		if(ReadPin(leds[3].iPort, leds[3].iName))
 			WritePin(leds[3].iPort, leds[3].iName, GPIO_PIN_RESET);
 		else
 			WritePin(leds[3].iPort, leds[3].iName, GPIO_PIN_SET);
 
-
-		static char str[5] = {0, 0, 0, 0, 0};
-		sprintf(str, "%d", Clock_GetMs()/10);
-		add_characters(str, 4);
-		update_display();
-
-		static int cmdToSend = 0;
-		if(Clock_UpdateTimerUs(&transmitTimer))
+		static int m_iIsMotorEnabled = 0;
+		if(HAL_GPIO_ReadPin(POWER_SW_PORT, POWER_SW_PIN))
 		{
-			if(!Serial_WaitingForAck())
+			if(!m_iIsMotorEnabled)
 			{
-				SendCommand(cmdSeq[cmdToSend++]);
-				if(cmdToSend >= sizeof(cmdSeq)/sizeof(cmdSeq[0]))
-					cmdToSend = 0;
+				m_iIsMotorEnabled = 1;
+				nextCmd = CMD_MOTOR_ENABLE;
+				WritePin(leds[2].iPort, leds[2].iName, GPIO_PIN_SET);
+			}
+		}
+		else
+		{
+			if(m_iIsMotorEnabled)
+			{
+				m_iIsMotorEnabled = 0;
+				nextCmd = CMD_MOTOR_DISABLE;
+				WritePin(leds[2].iPort, leds[2].iName, GPIO_PIN_RESET);
 			}
 		}
 
+		if(Serial_GetResponse()->driveMode & MOTOR_MODE_CRUISING)
+			WritePin(leds[0].iPort, leds[0].iName, GPIO_PIN_SET);
+
+
+		if(Clock_UpdateTimer(&screenTimer))
+		{
+			char str[5] = {0, 0, 0, 0, 0};
+			if(Serial_GetResponse()->driveMode & MOTOR_MODE_OVERCURRENT)
+				sprintf(str, "%s", "Amps");
+			else if(Serial_GetResponse()->driveMode & MOTOR_MODE_OVERSPEED)
+				sprintf(str, "%s", "Sped");
+			else if(Serial_GetResponse()->driveMode & MOTOR_MODE_NOHEART)
+				sprintf(str, "%s", "HART");
+			else
+				sprintf(str, "%d", Serial_GetResponse()->millis/1000);
+
+			add_characters(str, 4);
+			update_display();
+		}
+
+
+		static uint16_t cmdToSend = 0;
+		if(Clock_UpdateTimerUs(&transmitTimer))
+		{
+			if(1)//!Serial_WaitingForAck())
+			{
+				if(nextCmd == CMD_MOTOR_NONE)
+				{
+					Serial_SendCommand(cmdSeq[cmdToSend]);
+					cmdToSend++;
+					if(cmdToSend >= sizeof(cmdSeq)/sizeof(cmdSeq[0]))
+						cmdToSend = 0;
+				}
+				else
+				{
+					Serial_SendCommand(nextCmd);
+					nextCmd = CMD_MOTOR_NONE;
+				}
+			}
+		}
+
+		static float throtOffset = 0;
+		static int throtOffsetCnt = 0;
+		if(throtOffsetCnt < 100)
+		{
+			throtOffset += ADC_GetThrottle();
+			throtOffsetCnt++;
+		}
+		else if(throtOffsetCnt != 999)
+		{
+			throtOffset = throtOffset/(float)throtOffsetCnt;
+			throtOffsetCnt = 999;
+		}
+
+		Serial_GetTransmit()->torqueValue = ((ADC_GetThrottle()-throtOffset)/100.0f) * 10.5f;
+//		Serial_GetTransmit()->speedValue = (ADC_GetThrottle()/100.0f) * 200.0f;
+
+		if(Clock_UpdateTimer(&secTimer))
+		{
+			seconds++;
+			if(m_iIsMotorEnabled)
+			{
+				nextCmd = CMD_MOTOR_ENABLE;
+			}
+		}
+
+#if 0
+		if(Clock_UpdateTimer(&secTimer))
+		{
+			seconds++;
+		}
+
+		if(seconds == 5)
+		{
+			nextCmd = CMD_MOTOR_ENABLE;
+			seconds++;
+		}
+
+		if(seconds == 7)
+		{
+//			Serial_GetTransmit()->torqueValue = 5.5f;
+			nextCmd = CMD_MOTOR_CRUISE;
+			seconds++;
+		}
+
+		if(seconds == 12)
+		{
+//			nextCmd = CMD_MOTOR_CRUISE;
+			seconds++;
+		}
+
+		if(seconds == 30)
+		{
+//			nextCmd = CMD_MOTOR_CRUISE;
+			seconds++;
+		}
+
+		if(seconds == 40)
+		{
+			nextCmd = CMD_MOTOR_DISABLE;
+			seconds++;
+		}
+#endif
 
 //		memset(str, 0, 4);
 //		sprintf(str, "%04X", (unsigned int)q_time.Instance->CNT);
 //		add_characters(str, 4);
 //		update_display();
 	}
-
 }
 
 /**
@@ -217,6 +328,9 @@ static void MX_DMA_Init(void)
 
 	HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 2, 0);
 	HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+
+	HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 3, 0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 }
 
 static void update_LEDs( void )
